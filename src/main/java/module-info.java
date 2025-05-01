@@ -10,7 +10,18 @@ module metu.ceng.ceng453_20242_group3_frontend {
     requires org.kordamp.bootstrapfx.core;
     requires eu.hansolo.tilesfx;
     requires com.almasb.fxgl.all;
+    requires java.net.http;
+    requires com.google.gson;
 
     opens metu.ceng.ceng453_20242_group3_frontend to javafx.fxml;
     exports metu.ceng.ceng453_20242_group3_frontend;
+    
+    opens metu.ceng.ceng453_20242_group3_frontend.controller to javafx.fxml;
+    exports metu.ceng.ceng453_20242_group3_frontend.controller;
+    
+    exports metu.ceng.ceng453_20242_group3_frontend.model;
+    exports metu.ceng.ceng453_20242_group3_frontend.model.card;
+    exports metu.ceng.ceng453_20242_group3_frontend.service;
+    exports metu.ceng.ceng453_20242_group3_frontend.util;
+    exports metu.ceng.ceng453_20242_group3_frontend.config;
 }

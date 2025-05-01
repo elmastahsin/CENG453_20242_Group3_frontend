@@ -131,6 +131,11 @@
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.10.1</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -154,7 +159,7 @@
                         <id>default-cli</id>
                         <configuration>
                             <mainClass>
-                                metu.ceng.ceng453_20242_group3_frontend/metu.ceng.ceng453_20242_group3_frontend.HelloApplication
+                                metu.ceng.ceng453_20242_group3_frontend/metu.ceng.ceng453_20242_group3_frontend.UnoApplication
                             </mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
