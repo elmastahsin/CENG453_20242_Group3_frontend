@@ -23,7 +23,16 @@ public class AppConfig {
     
     // Game constants
     public static final int INITIAL_CARDS_PER_PLAYER = 7;
-    public static final int NUMBER_OF_PLAYERS = 4;
+    public static final int DEFAULT_NUMBER_OF_PLAYERS = 4;
+    public static final int MAX_NUMBER_OF_PLAYERS = 4;
+    public static final int MIN_NUMBER_OF_PLAYERS = 2;
+    public static final int UNO_DECK_SIZE = 120;
+    
+    // Card-related constants
+    public static final int CARD_NUMBER_MIN = 0;
+    public static final int CARD_NUMBER_MAX = 9;
+    public static final int CARD_WILD_COUNT = 4; // Number of each wild card type
+    public static final int CARD_ACTION_COUNT = 2; // Number of each action card per color
     
     // UI constants
     public static final int WINDOW_WIDTH = 1024;
