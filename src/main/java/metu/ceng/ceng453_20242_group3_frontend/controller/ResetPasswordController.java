@@ -1,7 +1,9 @@
 package metu.ceng.ceng453_20242_group3_frontend.controller;
 
 import java.io.IOException;
+import java.net.URL;
 
+import javafx.animation.FadeTransition;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -9,10 +11,13 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.PasswordField;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.VBox;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import metu.ceng.ceng453_20242_group3_frontend.service.AuthService;
 
 /**
@@ -39,7 +44,10 @@ public class ResetPasswordController {
     private Button backToLoginButton;
     
     @FXML
-    private VBox resetPasswordPane;
+    private StackPane resetPasswordPane;
+    
+    @FXML
+    private ProgressIndicator progressIndicator;
     
     private final AuthService authService;
     
@@ -76,6 +84,12 @@ public class ResetPasswordController {
         if (resetToken != null && tokenField != null) {
             tokenField.setText(resetToken);
         }
+        
+        // Apply fade-in transition on load
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(800), resetPasswordPane);
+        fadeIn.setFromValue(0.0);
+        fadeIn.setToValue(1.0);
+        fadeIn.play();
     }
     
     /**
@@ -114,12 +128,16 @@ public class ResetPasswordController {
             return;
         }
         
+        // Show progress indicator and disable button
+        progressIndicator.setVisible(true);
         submitButton.setDisable(true);
         
         // Call the auth service to complete password reset
         authService.completePasswordReset(resetToken, newPassword,
             () -> {
                 // On successful password reset
+                progressIndicator.setVisible(false);
+                
                 showAlert(Alert.AlertType.INFORMATION, "Password Reset Successful", 
                           "Your password has been successfully reset. Please log in with your new password.");
                 
@@ -134,6 +152,7 @@ public class ResetPasswordController {
             },
             errorMessage -> {
                 // On password reset failure
+                progressIndicator.setVisible(false);
                 showAlert(Alert.AlertType.ERROR, "Password Reset Failed", errorMessage);
                 submitButton.setDisable(false);
             }
@@ -148,8 +167,33 @@ public class ResetPasswordController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/login-view.fxml"));
             Parent root = loader.load();
             
+            Scene scene = new Scene(root);
+            // Apply CSS styling
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
             Stage stage = (Stage) resetPasswordPane.getScene().getWindow();
-            stage.setScene(new Scene(root));
+            
+            // Create fade-out transition
+            FadeTransition fadeOut = new FadeTransition(Duration.millis(300), resetPasswordPane);
+            fadeOut.setFromValue(1.0);
+            fadeOut.setToValue(0.0);
+            fadeOut.setOnFinished(e -> {
+                // Add keyboard shortcuts for full screen mode
+                scene.setOnKeyPressed(ke -> {
+                    if (ke.getCode() == KeyCode.F11) {
+                        stage.setFullScreen(!stage.isFullScreen());
+                    } else if (ke.getCode() == KeyCode.ENTER && ke.isAltDown()) {
+                        stage.setFullScreen(!stage.isFullScreen());
+                    }
+                });
+                
+                stage.setScene(scene);
+            });
+            fadeOut.play();
+            
         } catch (IOException e) {
             showAlert(Alert.AlertType.ERROR, "Navigation Error", 
                       "Could not navigate to login page: " + e.getMessage());

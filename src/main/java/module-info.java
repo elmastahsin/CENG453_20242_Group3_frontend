@@ -12,6 +12,7 @@ module metu.ceng.ceng453_20242_group3_frontend {
     requires com.almasb.fxgl.all;
     requires java.net.http;
     requires com.google.gson;
+    requires com.fasterxml.jackson.databind;
 
     opens metu.ceng.ceng453_20242_group3_frontend to javafx.fxml;
     exports metu.ceng.ceng453_20242_group3_frontend;

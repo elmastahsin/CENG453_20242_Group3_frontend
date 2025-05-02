@@ -1,6 +1,7 @@
 package metu.ceng.ceng453_20242_group3_frontend.controller;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.regex.Pattern;
 
 import javafx.application.Platform;
@@ -13,7 +14,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.VBox;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import metu.ceng.ceng453_20242_group3_frontend.service.AuthService;
 
@@ -44,7 +46,7 @@ public class RegisterController {
     private Button backToLoginButton;
     
     @FXML
-    private VBox registerPane;
+    private StackPane registerPane;
     
     private final AuthService authService;
     
@@ -196,8 +198,26 @@ public class RegisterController {
             // Create the new scene
             Scene scene = new Scene(root);
             
+            // Apply CSS styling
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+                System.out.println("CSS styling applied successfully");
+            } else {
+                System.out.println("WARNING: CSS styling not found");
+            }
+            
             // Get the current stage from any element in the current scene
             Stage stage = (Stage) registerPane.getScene().getWindow();
+            
+            // Add keyboard shortcuts for full screen mode
+            scene.setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.F11) {
+                    stage.setFullScreen(!stage.isFullScreen());
+                } else if (e.getCode() == KeyCode.ENTER && e.isAltDown()) {
+                    stage.setFullScreen(!stage.isFullScreen());
+                }
+            });
             
             // Set and show the new scene
             stage.setScene(scene);
@@ -217,8 +237,25 @@ public class RegisterController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/login-view.fxml"));
             Parent root = loader.load();
             
+            Scene scene = new Scene(root);
+            // Apply CSS styling
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
             Stage stage = (Stage) registerPane.getScene().getWindow();
-            stage.setScene(new Scene(root));
+            
+            // Add keyboard shortcuts for full screen mode
+            scene.setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.F11) {
+                    stage.setFullScreen(!stage.isFullScreen());
+                } else if (e.getCode() == KeyCode.ENTER && e.isAltDown()) {
+                    stage.setFullScreen(!stage.isFullScreen());
+                }
+            });
+            
+            stage.setScene(scene);
         } catch (IOException e) {
             showAlert(Alert.AlertType.ERROR, "Navigation Error", 
                       "Could not navigate to login page: " + e.getMessage());

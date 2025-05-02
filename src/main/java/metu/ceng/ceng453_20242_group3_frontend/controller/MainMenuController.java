@@ -1,7 +1,10 @@
 package metu.ceng.ceng453_20242_group3_frontend.controller;
 
 import java.io.IOException;
+import java.net.URL;
 
+import javafx.animation.FadeTransition;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -9,8 +12,11 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import metu.ceng.ceng453_20242_group3_frontend.service.AuthService;
 import metu.ceng.ceng453_20242_group3_frontend.util.SessionManager;
 
@@ -35,7 +41,7 @@ public class MainMenuController {
     private Button logoutButton;
     
     @FXML
-    private VBox mainMenuPane;
+    private StackPane mainMenuPane;
     
     // Debug elements
     @FXML
@@ -131,6 +137,22 @@ public class MainMenuController {
             
             // Set the new scene
             Scene gameScene = new Scene(root);
+            
+            // Apply CSS styling
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            if (cssUrl != null) {
+                gameScene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
+            // Add keyboard shortcuts for full screen in game scene
+            gameScene.setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.F11) {
+                    stage.setFullScreen(!stage.isFullScreen());
+                } else if (e.getCode() == KeyCode.ENTER && e.isAltDown()) {
+                    stage.setFullScreen(!stage.isFullScreen());
+                }
+            });
+            
             stage.setScene(gameScene);
             
             System.out.println("Starting new game...");
@@ -146,9 +168,34 @@ public class MainMenuController {
      * Shows the leaderboard.
      */
     private void showLeaderboard() {
-        // This would navigate to the leaderboard screen
-        showAlert(Alert.AlertType.INFORMATION, "Leaderboard", "Opening leaderboard...");
-        // Implementation for showing leaderboard will be added later
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/leaderboard-view.fxml"));
+            Parent root = loader.load();
+            
+            Scene scene = new Scene(root);
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
+            // Add the fade transition class
+            root.getStyleClass().add("fade-transition");
+            
+            Stage stage = (Stage) mainMenuPane.getScene().getWindow();
+            stage.setScene(scene);
+            
+            // Animate the fade in
+            Platform.runLater(() -> {
+                FadeTransition fadeIn = new FadeTransition(Duration.millis(300), root);
+                fadeIn.setFromValue(0.0);
+                fadeIn.setToValue(1.0);
+                fadeIn.play();
+            });
+            
+        } catch (IOException e) {
+            showAlert(Alert.AlertType.ERROR, "Navigation Error", 
+                      "Could not open leaderboard: " + e.getMessage());
+        }
     }
     
     /**
@@ -170,8 +217,24 @@ public class MainMenuController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/login-view.fxml"));
             Parent root = loader.load();
             
+            Scene scene = new Scene(root);
+            // Apply CSS styling
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
+            // Add keyboard shortcuts for full screen in login scene
             Stage stage = (Stage) mainMenuPane.getScene().getWindow();
-            stage.setScene(new Scene(root));
+            scene.setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.F11) {
+                    stage.setFullScreen(!stage.isFullScreen());
+                } else if (e.getCode() == KeyCode.ENTER && e.isAltDown()) {
+                    stage.setFullScreen(!stage.isFullScreen());
+                }
+            });
+            
+            stage.setScene(scene);
         } catch (IOException e) {
             showAlert(Alert.AlertType.ERROR, "Navigation Error", 
                       "Could not navigate to login page: " + e.getMessage());

@@ -11,6 +11,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -87,6 +88,21 @@ public class GameController {
     @FXML
     private HBox playerCardsContainer;
     
+    @FXML
+    private Button quitButton;
+    
+    @FXML
+    private VBox leftPlayerCardsContainer;
+    
+    @FXML
+    private VBox rightPlayerCardsContainer;
+    
+    @FXML
+    private StackPane currentCardContainer;
+    
+    @FXML
+    private ImageView directionIndicator;
+    
     // Card colors
     private final Color RED_COLOR = Color.rgb(227, 35, 45);
     private final Color GREEN_COLOR = Color.rgb(67, 176, 71);
@@ -96,23 +112,16 @@ public class GameController {
     // Direction
     private boolean isClockwise = true;
     
-    // Will hold the references to our custom direction indicators
-    private StackPane clockwisePane;
-    private StackPane counterClockwisePane;
-    
     @FXML
     private void initialize() {
         // Set player name from session
         if (SessionManager.getInstance().isLoggedIn()) {
             String username = SessionManager.getInstance().getCurrentUser().getUsername();
-            playerNameLabel.setText(username);
+            turnIndicatorLabel.setText(username + " (You)");
         }
         
         // Set up action buttons
         setupActionButtons();
-        
-        // Create direction indicators
-        setupDirectionIndicators();
         
         // Create draw and discard piles
         setupCardPiles();
@@ -126,11 +135,11 @@ public class GameController {
         // Set up leaderboard
         setupLeaderboard();
         
-        // Add sample chat messages
-        addSampleChatMessages();
+        // Set initial direction indicator
+        updateDirectionIndicator();
         
-        // Set up send message button
-        sendMessageButton.setOnAction(event -> sendChatMessage());
+        // Set up quit button
+        quitButton.setOnAction(event -> navigateToMainMenu());
     }
     
     private void setupActionButtons() {
@@ -144,88 +153,24 @@ public class GameController {
         wildDrawFourButton.setOnAction(event -> playSpecialCard("Wild Draw Four"));
     }
     
-    private void setupDirectionIndicators() {
-        try {
-            // Create direction arrows using shapes instead of images
-            StackPane clockwiseArrow = createDirectionArrow(true);
-            StackPane counterClockwiseArrow = createDirectionArrow(false);
-            
-            // Add arrows to the layout
-            clockwisePane = new StackPane(clockwiseArrow);
-            counterClockwisePane = new StackPane(counterClockwiseArrow);
-            
-            clockwisePane.setMaxSize(50, 50);
-            counterClockwisePane.setMaxSize(50, 50);
-            
-            // Replace the ImageView with the custom arrows
-            StackPane parentCW = (StackPane) clockwiseIndicator.getParent();
-            StackPane parentCCW = (StackPane) counterClockwiseIndicator.getParent();
-            
-            int cwIndex = parentCW.getChildren().indexOf(clockwiseIndicator);
-            int ccwIndex = parentCCW.getChildren().indexOf(counterClockwiseIndicator);
-            
-            if (cwIndex >= 0) {
-                parentCW.getChildren().set(cwIndex, clockwisePane);
-            } else {
-                parentCW.getChildren().add(clockwisePane);
-            }
-            
-            if (ccwIndex >= 0) {
-                parentCCW.getChildren().set(ccwIndex, counterClockwisePane);
-            } else {
-                parentCCW.getChildren().add(counterClockwisePane);
-            }
-            
-            // Show only the current direction
-            updateDirectionIndicators();
-            
-        } catch (Exception e) {
-            System.err.println("Error setting up direction indicators: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-    
-    private StackPane createDirectionArrow(boolean clockwise) {
-        StackPane arrowPane = new StackPane();
-        arrowPane.setMaxSize(40, 40);
-        
-        // Create circle
-        javafx.scene.shape.Circle circle = new javafx.scene.shape.Circle(20);
-        circle.setFill(Color.ORANGE);
-        circle.setStroke(Color.WHITE);
-        circle.setStrokeWidth(2);
-        
-        // Create arrow path
-        javafx.scene.shape.SVGPath arrow = new javafx.scene.shape.SVGPath();
-        if (clockwise) {
-            arrow.setContent("M10,5 L20,15 L10,25 M30,15 L15,15");
-        } else {
-            arrow.setContent("M30,5 L20,15 L30,25 M10,15 L25,15");
-        }
-        arrow.setFill(Color.TRANSPARENT);
-        arrow.setStroke(Color.WHITE);
-        arrow.setStrokeWidth(3);
-        
-        arrowPane.getChildren().addAll(circle, arrow);
-        return arrowPane;
-    }
-    
     private void setupCardPiles() {
-        // Create draw pile
-        Rectangle drawCardBack = createCardBack();
-        drawPileContainer.getChildren().add(drawCardBack);
+        // No need to add anything to drawPileContainer as it's already defined in the FXML
         
         // Create discard pile with a sample card
-        StackPane discardCard = createCard("3", RED_COLOR);
-        discardPileContainer.getChildren().add(discardCard);
+        StackPane discardCard = createCard("9", RED_COLOR);
+        currentCardContainer.getChildren().clear();
+        currentCardContainer.getChildren().add(discardCard);
     }
     
     private void createPlayerCards() {
         // Sample player cards
         List<Pair<String, Color>> playerCards = Arrays.asList(
             new Pair<>("7", BLUE_COLOR),
-            new Pair<>("1", RED_COLOR),
             new Pair<>("2", GREEN_COLOR),
+            new Pair<>("4", GREEN_COLOR),
+            new Pair<>("0", RED_COLOR),
+            new Pair<>("2", RED_COLOR),
+            new Pair<>("2", BLUE_COLOR),
             new Pair<>("Wild", null)
         );
         
@@ -237,12 +182,32 @@ public class GameController {
     }
     
     private void createOpponentCards() {
-        // Sample opponent cards (show card backs)
-        for (int i = 0; i < 5; i++) {
+        // Create opponent cards for top opponent
+        for (int i = 0; i < 7; i++) {
             Rectangle cardBack = createCardBack();
-            cardBack.setWidth(70); // Smaller cards for opponent
-            cardBack.setHeight(100);
-            opponentCardsContainer.getChildren().add(cardBack);
+            StackPane card = new StackPane(cardBack);
+            card.getStyleClass().add("uno-card");
+            opponentCardsContainer.getChildren().add(card);
+        }
+        
+        // Create cards for left computer player
+        for (int i = 0; i < 8; i++) {
+            Rectangle cardBack = createCardBack();
+            cardBack.setWidth(60);
+            cardBack.setHeight(90);
+            StackPane card = new StackPane(cardBack);
+            card.getStyleClass().add("uno-card");
+            leftPlayerCardsContainer.getChildren().add(card);
+        }
+        
+        // Create cards for right computer player
+        for (int i = 0; i < 9; i++) {
+            Rectangle cardBack = createCardBack();
+            cardBack.setWidth(60);
+            cardBack.setHeight(90);
+            StackPane card = new StackPane(cardBack);
+            card.getStyleClass().add("uno-card");
+            rightPlayerCardsContainer.getChildren().add(card);
         }
     }
     
@@ -388,14 +353,16 @@ public class GameController {
     
     private void toggleDirection() {
         isClockwise = !isClockwise;
-        updateDirectionIndicators();
+        updateDirectionIndicator();
     }
     
-    private void updateDirectionIndicators() {
-        if (clockwisePane != null && counterClockwisePane != null) {
-            clockwisePane.setVisible(isClockwise);
-            counterClockwisePane.setVisible(!isClockwise);
-        }
+    private void updateDirectionIndicator() {
+        String imagePath = isClockwise 
+            ? "/images/arrow-clockwise.png" 
+            : "/images/arrow-counterclockwise.png";
+        
+        Image directionImage = new Image(getClass().getResourceAsStream(imagePath));
+        directionIndicator.setImage(directionImage);
     }
     
     /**

@@ -10,9 +10,13 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCombination;
 import javafx.stage.Stage;
 import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
 import metu.ceng.ceng453_20242_group3_frontend.controller.ResetPasswordController;
+import metu.ceng.ceng453_20242_group3_frontend.util.IconGenerator;
 import metu.ceng.ceng453_20242_group3_frontend.util.LogoGenerator;
 import metu.ceng.ceng453_20242_group3_frontend.util.ProtocolHandler;
 
@@ -28,11 +32,12 @@ public class UnoApplication extends Application {
     
     @Override
     public void init() {
-        // Generate the logo on startup
+        // Generate the logo and icon on startup
         try {
             LogoGenerator.generateLogo();
+            IconGenerator.generateIcon();
         } catch (Exception e) {
-            System.err.println("Failed to generate logo: " + e.getMessage());
+            System.err.println("Failed to generate logo or icon: " + e.getMessage());
         }
         
         // Register the protocol handler for handling password reset links
@@ -65,6 +70,26 @@ public class UnoApplication extends Application {
         // Set this system property to help with some macOS rendering issues
         System.setProperty("prism.order", "sw");
         
+        // Set application icon
+        try {
+            URL iconUrl = getClass().getResource("/images/app_icon.png");
+            if (iconUrl != null) {
+                stage.getIcons().add(new Image(iconUrl.toExternalForm()));
+            } else {
+                System.err.println("Could not find application icon");
+            }
+        } catch (Exception e) {
+            System.err.println("Error setting application icon: " + e.getMessage());
+        }
+        
+        // Configure stage for resizable and full screen capability
+        stage.setTitle(AppConfig.GAME_TITLE);
+        stage.setResizable(true); // Make window resizable
+        
+        // Set up full screen shortcut (F11 or Alt+Enter)
+        stage.setFullScreenExitKeyCombination(KeyCombination.valueOf("F11"));
+        stage.setFullScreenExitHint("Press F11 to exit full screen mode");
+        
         // Get parameters to check if app was launched with a reset token
         Parameters params = getParameters();
         List<String> rawParams = params.getRaw();
@@ -96,10 +121,6 @@ public class UnoApplication extends Application {
             showLoginView();
         }
         
-        // Configure stage
-        stage.setTitle(AppConfig.GAME_TITLE);
-        stage.setResizable(false);
-        
         // Add a graceful shutdown hook
         stage.setOnCloseRequest(e -> {
             Platform.exit();
@@ -115,14 +136,23 @@ public class UnoApplication extends Application {
      */
     private void showLoginView() throws IOException {
         try {
-            FXMLLoader fxmlLoader = new FXMLLoader(UnoApplication.class.getResource("login-view.fxml"));
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/login-view.fxml"));
             Scene scene = new Scene(fxmlLoader.load(), AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT);
             
             // Apply CSS styling if available
-            URL cssUrl = UnoApplication.class.getResource("styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
+            
+            // Set up keyboard shortcuts for this scene
+            scene.setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.F11) {
+                    primaryStage.setFullScreen(!primaryStage.isFullScreen());
+                } else if (e.getCode() == KeyCode.ENTER && e.isAltDown()) {
+                    primaryStage.setFullScreen(!primaryStage.isFullScreen());
+                }
+            });
             
             primaryStage.setScene(scene);
         } catch (Exception e) {
@@ -139,7 +169,7 @@ public class UnoApplication extends Application {
      */
     private void showResetPasswordView(String token) throws IOException {
         try {
-            FXMLLoader fxmlLoader = new FXMLLoader(UnoApplication.class.getResource("reset-password-view.fxml"));
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/reset-password-view.fxml"));
             Scene scene = new Scene(fxmlLoader.load(), AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT);
             
             // Set the token in the controller
@@ -147,10 +177,19 @@ public class UnoApplication extends Application {
             controller.setResetToken(token);
             
             // Apply CSS styling if available
-            URL cssUrl = UnoApplication.class.getResource("styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
+            
+            // Set up keyboard shortcuts for this scene
+            scene.setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.F11) {
+                    primaryStage.setFullScreen(!primaryStage.isFullScreen());
+                } else if (e.getCode() == KeyCode.ENTER && e.isAltDown()) {
+                    primaryStage.setFullScreen(!primaryStage.isFullScreen());
+                }
+            });
             
             primaryStage.setScene(scene);
         } catch (Exception e) {

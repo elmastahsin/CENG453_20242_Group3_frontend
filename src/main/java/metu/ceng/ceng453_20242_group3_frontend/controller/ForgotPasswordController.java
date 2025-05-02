@@ -1,8 +1,10 @@
 package metu.ceng.ceng453_20242_group3_frontend.controller;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.regex.Pattern;
 
+import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -10,10 +12,13 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.VBox;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import metu.ceng.ceng453_20242_group3_frontend.service.AuthService;
 
 /**
@@ -34,7 +39,10 @@ public class ForgotPasswordController {
     private Button backToLoginButton;
     
     @FXML
-    private VBox forgotPasswordPane;
+    private StackPane forgotPasswordPane;
+    
+    @FXML
+    private ProgressIndicator loadingIndicator;
     
     private final AuthService authService;
     
@@ -52,6 +60,12 @@ public class ForgotPasswordController {
         // Set up event handlers
         resetPasswordButton.setOnAction(event -> resetPassword());
         backToLoginButton.setOnAction(event -> navigateToLogin());
+        
+        // Apply fade-in transition on load
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(800), forgotPasswordPane);
+        fadeIn.setFromValue(0.0);
+        fadeIn.setToValue(1.0);
+        fadeIn.play();
     }
     
     /**
@@ -72,7 +86,10 @@ public class ForgotPasswordController {
             return;
         }
         
+        // Show loading indicator
+        loadingIndicator.setVisible(true);
         resetPasswordButton.setDisable(true);
+        backToLoginButton.setDisable(true);
         
         // Call the auth service to reset password
         authService.resetPassword(email,
@@ -80,13 +97,26 @@ public class ForgotPasswordController {
                 // On successful reset request
                 Platform.runLater(() -> {
                     try {
-                        // Instead of showing instructions and going back to login,
-                        // direct the user to the reset password form
+                        // Hide loading indicator
+                        loadingIndicator.setVisible(false);
+                        resetPasswordButton.setDisable(false);
+                        backToLoginButton.setDisable(false);
+                        
+                        // Show success message
+                        Alert info = new Alert(Alert.AlertType.INFORMATION);
+                        info.setTitle("Reset Email Sent");
+                        info.setHeaderText(null);
+                        info.setContentText("A reset link has been sent to your email. Please check your email and enter the reset token below.");
+                        info.showAndWait();
+                        
+                        // Direct the user to the reset password form
                         showResetPasswordForm();
                     } catch (Exception e) {
                         showAlert(Alert.AlertType.ERROR, "Navigation Error", 
                                   "Could not navigate to reset password form: " + e.getMessage());
                         resetPasswordButton.setDisable(false);
+                        backToLoginButton.setDisable(false);
+                        loadingIndicator.setVisible(false);
                     }
                 });
             },
@@ -94,11 +124,14 @@ public class ForgotPasswordController {
                 // On reset request failure
                 Platform.runLater(() -> {
                     try {
+                        // Hide loading indicator
+                        loadingIndicator.setVisible(false);
+                        resetPasswordButton.setDisable(false);
+                        backToLoginButton.setDisable(false);
+                        
                         showAlert(Alert.AlertType.ERROR, "Reset Request Failed", errorMessage);
                     } catch (Exception e) {
                         System.err.println("Error showing alert: " + e.getMessage());
-                    } finally {
-                        resetPasswordButton.setDisable(false);
                     }
                 });
             }
@@ -113,14 +146,33 @@ public class ForgotPasswordController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/reset-password-view.fxml"));
             Parent root = loader.load();
             
-            Alert info = new Alert(Alert.AlertType.INFORMATION);
-            info.setTitle("Reset Email Sent");
-            info.setHeaderText(null);
-            info.setContentText("A reset link has been sent to your email. Please check your email and enter the reset token below.");
-            info.showAndWait();
+            Scene scene = new Scene(root);
+            // Apply CSS styling
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
             
             Stage stage = (Stage) forgotPasswordPane.getScene().getWindow();
-            stage.setScene(new Scene(root));
+            
+            // Create fade-out transition
+            FadeTransition fadeOut = new FadeTransition(Duration.millis(300), forgotPasswordPane);
+            fadeOut.setFromValue(1.0);
+            fadeOut.setToValue(0.0);
+            fadeOut.setOnFinished(e -> {
+                // Add keyboard shortcuts for full screen mode
+                scene.setOnKeyPressed(ke -> {
+                    if (ke.getCode() == KeyCode.F11) {
+                        stage.setFullScreen(!stage.isFullScreen());
+                    } else if (ke.getCode() == KeyCode.ENTER && ke.isAltDown()) {
+                        stage.setFullScreen(!stage.isFullScreen());
+                    }
+                });
+                
+                stage.setScene(scene);
+            });
+            fadeOut.play();
+            
         } catch (IOException e) {
             showAlert(Alert.AlertType.ERROR, "Navigation Error", 
                       "Could not navigate to reset password form: " + e.getMessage());
@@ -135,8 +187,33 @@ public class ForgotPasswordController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/login-view.fxml"));
             Parent root = loader.load();
             
+            Scene scene = new Scene(root);
+            // Apply CSS styling
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
             Stage stage = (Stage) forgotPasswordPane.getScene().getWindow();
-            stage.setScene(new Scene(root));
+            
+            // Create fade-out transition
+            FadeTransition fadeOut = new FadeTransition(Duration.millis(300), forgotPasswordPane);
+            fadeOut.setFromValue(1.0);
+            fadeOut.setToValue(0.0);
+            fadeOut.setOnFinished(e -> {
+                // Add keyboard shortcuts for full screen mode
+                scene.setOnKeyPressed(ke -> {
+                    if (ke.getCode() == KeyCode.F11) {
+                        stage.setFullScreen(!stage.isFullScreen());
+                    } else if (ke.getCode() == KeyCode.ENTER && ke.isAltDown()) {
+                        stage.setFullScreen(!stage.isFullScreen());
+                    }
+                });
+                
+                stage.setScene(scene);
+            });
+            fadeOut.play();
+            
         } catch (IOException e) {
             showAlert(Alert.AlertType.ERROR, "Navigation Error", 
                       "Could not navigate to login page: " + e.getMessage());
