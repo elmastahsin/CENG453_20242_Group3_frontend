@@ -147,7 +147,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>metu.ceng.ceng453_20242_group3_frontend.UnoApplication</mainClass>
+                    <mainClass>metu.ceng.ceng453_20242_group3_frontend.app.UnoApplication</mainClass>
                 </configuration>
             </plugin>
         </plugins>

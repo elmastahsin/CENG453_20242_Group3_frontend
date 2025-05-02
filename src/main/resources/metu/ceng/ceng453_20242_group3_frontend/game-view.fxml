@@ -17,7 +17,7 @@
 <?import javafx.scene.shape.Circle?>
 
 <AnchorPane fx:id="gamePane" xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" 
-            fx:controller="metu.ceng.ceng453_20242_group3_frontend.controller.GameController"
+            fx:controller="metu.ceng.ceng453_20242_group3_frontend.features.game.controller.GameController"
             styleClass="game-background">
 
     <!-- Main Game Grid - 3x3 Grid Layout -->

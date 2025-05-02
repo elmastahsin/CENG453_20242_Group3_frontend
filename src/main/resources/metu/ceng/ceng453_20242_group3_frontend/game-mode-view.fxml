@@ -13,7 +13,7 @@
 <StackPane fx:id="gameModePane" alignment="CENTER" styleClass="game-mode-pane" 
       xmlns="http://javafx.com/javafx" 
       xmlns:fx="http://javafx.com/fxml" 
-      fx:controller="metu.ceng.ceng453_20242_group3_frontend.controller.GameModeController"
+      fx:controller="metu.ceng.ceng453_20242_group3_frontend.features.game.controller.GameModeController"
       prefHeight="768.0" prefWidth="1024.0">
     
     <!-- Background elements -->

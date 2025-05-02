@@ -14,7 +14,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<StackPane fx:id="leaderboardPane" styleClass="main-container" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="metu.ceng.ceng453_20242_group3_frontend.controller.LeaderboardController">
+<StackPane fx:id="leaderboardPane" styleClass="main-container" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="metu.ceng.ceng453_20242_group3_frontend.features.leaderboard.controller.LeaderboardController">
     <children>
         <!-- Background card decorations -->
         <ImageView fitHeight="200.0" fitWidth="200.0" pickOnBounds="true" preserveRatio="true" StackPane.alignment="TOP_LEFT">
