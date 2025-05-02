@@ -1,0 +1,18 @@
+IMPORTANT: Create the following images for the UNO game UI:
+
+1. src/main/resources/images/top-cards.png - A decorative image of UNO cards spread in top-right corner
+2. src/main/resources/images/bottom-cards.png - A decorative image of UNO cards spread in bottom-left corner
+3. src/main/resources/images/arrow-clockwise.png - A clockwise direction indicator arrow
+4. src/main/resources/images/arrow-counterclockwise.png - A counter-clockwise direction indicator arrow
+5. src/main/resources/images/card-back.png - The back side design of UNO cards
+6. src/main/resources/images/card-9-red.png - A sample red 9 UNO card
+
+These images are required for the UI to render correctly. You can find example designs in the referenced screenshot provided.
+
+Note that these are temporary placeholder files. You should replace them with proper images that match the UNO game style.
+
+The UI is designed with a modern gradient background (pink to orange for login, red to blue for game) and follows the visual style from the reference image.
+
+If you need to create additional card images, place them in the src/main/resources/images/cards/ directory following the naming pattern:
+- For number cards: card-[number]-[color].png (e.g., card-5-blue.png)
+- For special cards: card-[type]-[color].png (e.g., card-skip-green.png, card-wild.png)
