@@ -1,0 +1,114 @@
+/* 
+ * Game Mode styles for UNO Game
+ * Contains styles for game mode selection and configuration screens
+ */
+
+/* Game Mode Selection Styles */
+.game-mode-pane {
+    -fx-background-color: linear-gradient(to right bottom, #fe6565, #ff9468);
+    -fx-background-radius: 0;
+}
+
+.game-mode-option {
+    -fx-background-color: white;
+    -fx-background-radius: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10, 0, 0, 5);
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+    -fx-border-radius: 15;
+    -fx-border-width: 3;
+}
+
+.game-mode-option:hover {
+    -fx-background-color: #f8f8f8;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 15, 0, 0, 8);
+    -fx-border-color: #ff9468;
+}
+
+.disabled-mode-option {
+    -fx-opacity: 0.7;
+}
+
+.mode-title {
+    -fx-text-fill: #333333;
+    -fx-font-weight: bold;
+}
+
+.mode-description {
+    -fx-text-fill: #666666;
+    -fx-font-size: 14px;
+    -fx-text-alignment: center;
+}
+
+.coming-soon-label {
+    -fx-text-fill: #ff6b6b;
+    -fx-font-style: italic;
+}
+
+.mode-button {
+    -fx-background-color: #ff6b6b;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 10 20;
+    -fx-cursor: hand;
+}
+
+.mode-button:hover {
+    -fx-background-color: #ff5252;
+}
+
+.disabled-button {
+    -fx-background-color: #999999;
+    -fx-text-fill: #eeeeee;
+    -fx-opacity: 0.8;
+}
+
+.back-button {
+    -fx-background-color: #6c757d;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 10 20;
+    -fx-cursor: hand;
+}
+
+.back-button:hover {
+    -fx-background-color: #5a6268;
+}
+
+/* Game Configuration Styles */
+.game-config-pane {
+    -fx-background-color: linear-gradient(to right bottom, #fe6565, #ff9468);
+    -fx-background-radius: 0;
+}
+
+.config-label {
+    -fx-text-fill: #333333;
+    -fx-font-weight: bold;
+}
+
+.speed-value-label {
+    -fx-text-fill: #666666;
+    -fx-font-style: italic;
+}
+
+.start-game-button {
+    -fx-background-color: #28a745;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 15 30;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 5, 0, 0, 2);
+}
+
+.start-game-button:hover {
+    -fx-background-color: #218838;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 8, 0, 0, 3);
+}
+
+.player-count-label {
+    -fx-text-fill: #ff6b6b;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 5, 0, 0, 2);
+} 

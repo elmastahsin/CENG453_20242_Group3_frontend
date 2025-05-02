@@ -1,0 +1,103 @@
+/* 
+ * Base styles for UNO Game
+ * Contains common styles, variables and global elements
+ */
+
+/* General styles */
+.root {
+    -fx-font-family: "Poppins", "Segoe UI", sans-serif;
+    -fx-background-color: linear-gradient(to bottom right, #2c3e50, #1a1a2e);
+    -fx-transition-duration: 300ms;
+}
+
+/* Fade transition effect */
+.fade-transition {
+    -fx-opacity: 0;
+    -fx-transition: opacity 300ms ease-in-out;
+}
+
+.fade-transition-in {
+    -fx-opacity: 1;
+}
+
+/* Modern Loading Dialog */
+.modern-loading-pane {
+    -fx-background-color: rgba(255, 255, 255, 0.95);
+    -fx-background-radius: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 15, 0, 0, 10);
+    -fx-padding: 30;
+}
+
+.modern-loading-content {
+    -fx-spacing: 20;
+    -fx-alignment: center;
+    -fx-padding: 20;
+}
+
+.modern-loading-spinner {
+    -fx-background-color: transparent;
+    -fx-border-color: #ff6b6b;
+    -fx-border-width: 5;
+    -fx-border-radius: 50%;
+    -fx-background-radius: 50%;
+    -fx-border-insets: 5;
+}
+
+.modern-loading-spinner:before {
+    -fx-background-color: #ff6b6b;
+    -fx-background-radius: 50%;
+    -fx-min-width: 20;
+    -fx-min-height: 20;
+}
+
+.modern-loading-title {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+}
+
+.modern-loading-message {
+    -fx-font-size: 16px;
+    -fx-text-fill: #666666;
+    -fx-text-alignment: center;
+}
+
+/* Modern Alert Dialog */
+.modern-alert-pane {
+    -fx-background-color: rgba(255, 255, 255, 0.95);
+    -fx-background-radius: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 15, 0, 0, 10);
+    -fx-padding: 25;
+}
+
+.modern-alert-content {
+    -fx-spacing: 15;
+    -fx-alignment: center;
+    -fx-padding: 15;
+}
+
+.modern-alert-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+}
+
+.modern-alert-message {
+    -fx-font-size: 14px;
+    -fx-text-fill: #666666;
+    -fx-text-alignment: center;
+    -fx-wrap-text: true;
+}
+
+.modern-alert-button {
+    -fx-background-color: #ff6b6b;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 10 20;
+    -fx-cursor: hand;
+}
+
+.modern-alert-button:hover {
+    -fx-background-color: #ff5252;
+} 
