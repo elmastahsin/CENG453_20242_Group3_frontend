@@ -99,20 +99,26 @@ public class Deck {
 
     /**
      * Adds a card to the deck.
+     * For discard piles, this adds it to the top (index 0)
      *
      * @param card The card to add
      */
     public void addCard(Card card) {
-        cards.add(card);
+        // Add to the beginning of the list so peek returns the most recently added card
+        cards.add(0, card);
     }
 
     /**
      * Adds multiple cards to the deck.
+     * For discard piles, this adds them in reverse order so the first card in the list ends up on top
      *
      * @param cardsToAdd The list of cards to add
      */
     public void addCards(List<Card> cardsToAdd) {
-        cards.addAll(cardsToAdd);
+        // Add cards in reverse order to maintain the expected ordering
+        for (int i = cardsToAdd.size() - 1; i >= 0; i--) {
+            addCard(cardsToAdd.get(i));
+        }
     }
 
     /**

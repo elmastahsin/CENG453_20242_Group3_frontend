@@ -306,11 +306,50 @@ public class GameController {
         if (initialCard != null) {
             firstCardPlayed = true;
             
-            // Update discard pile view
-            setupDiscardPile();
+            // Create and animate the initial card being placed
+            StackPane cardView = CardRenderer.createCardView(initialCard);
+            cardView.setScaleX(0.1);
+            cardView.setScaleY(0.1);
+            cardView.setOpacity(0);
             
-            // Update playable cards
-            updatePlayableCards();
+            // Clear and add to the discard pile container
+            discardPileContainer.getChildren().clear();
+            discardPileContainer.getChildren().add(cardView);
+            
+            // Add discard pile label
+            Label pileLabel = new Label("DISCARD PILE");
+            pileLabel.getStyleClass().add("card-pile-label");
+            discardPileContainer.getChildren().add(pileLabel);
+            
+            // Animate the card appearing
+            javafx.animation.ScaleTransition scaleX = new javafx.animation.ScaleTransition(Duration.millis(500), cardView);
+            scaleX.setToX(1.0);
+            
+            javafx.animation.ScaleTransition scaleY = new javafx.animation.ScaleTransition(Duration.millis(500), cardView);
+            scaleY.setToY(1.0);
+            
+            javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(Duration.millis(500), cardView);
+            fade.setToValue(1.0);
+            
+            javafx.animation.ParallelTransition animation = new javafx.animation.ParallelTransition(scaleX, scaleY, fade);
+            animation.setOnFinished(e -> {
+                // Add rotation after animation completes
+                cardView.setRotate(-5 + (Math.random() * 10));
+                
+                // Update playable cards
+                updatePlayableCards();
+                
+                // Update the current turn indicator
+                updateTurnLabel();
+                
+                // Update player animations
+                updatePlayerAreaAnimations();
+                
+                // Also play AI turn if needed
+                handleAITurns();
+            });
+            
+            animation.play();
         }
     }
     
@@ -375,17 +414,36 @@ public class GameController {
         if (topCard != null) {
             // Create card view for top card
             StackPane cardView = CardRenderer.createCardView(topCard);
+            
+            // Add a slight rotation for visual interest
+            cardView.setRotate(-5 + (Math.random() * 10)); // Random rotation between -5 and 5 degrees
+            
+            // Add shadow for emphasis
+            javafx.scene.effect.DropShadow shadow = new javafx.scene.effect.DropShadow();
+            shadow.setColor(javafx.scene.paint.Color.BLACK);
+            shadow.setRadius(10);
+            cardView.setEffect(shadow);
+            
             discardPileContainer.getChildren().add(cardView);
+            
+            // Log the top card for debugging
+            System.out.println("Current discard top card: " + topCard);
         } else {
             // Create an empty placeholder if there's no card
             StackPane emptyPlaceholder = CardRenderer.createEmptyCardPlaceholder();
             discardPileContainer.getChildren().add(emptyPlaceholder);
+            
+            // Log empty discard pile for debugging
+            System.out.println("Discard pile is empty");
         }
         
         // Add discard pile label
         Label pileLabel = new Label("DISCARD PILE");
         pileLabel.getStyleClass().add("card-pile-label");
         discardPileContainer.getChildren().add(pileLabel);
+        
+        // Add style class to the container
+        discardPileContainer.getStyleClass().add("discard-pile");
     }
     
     /**
@@ -396,20 +454,58 @@ public class GameController {
             return;
         }
         
+        // Only allow drawing when it's the player's turn
+        if (game.getCurrentPlayerIndex() != 0) {
+            return;
+        }
+        
         // Draw a card for the current player
         Card drawnCard = game.drawCardForCurrentPlayer();
         
-        // Update UI
-        updateUI();
-        
-        // Update direction indicator
-        updateDirectionIndicator();
-        
-        // Update turn label
-        updateTurnLabel();
-        
-        // Handle AI turns if necessary
-        handleAITurns();
+        if (drawnCard != null) {
+            // Create animation for card being added to hand
+            StackPane cardView = createCardView(drawnCard);
+            cardView.setOpacity(0);
+            cardView.setTranslateY(-20);
+            
+            // Add click event to the new card
+            cardView.setOnMouseClicked(event -> playCard(cardView, drawnCard));
+            
+            // Add the card to the player's hand UI
+            bottomPlayerCardsContainer.getChildren().add(cardView);
+            
+            // Animate the card appearing
+            javafx.animation.FadeTransition fadeIn = new javafx.animation.FadeTransition(Duration.millis(300), cardView);
+            fadeIn.setFromValue(0);
+            fadeIn.setToValue(1);
+            
+            javafx.animation.TranslateTransition moveIn = new javafx.animation.TranslateTransition(Duration.millis(300), cardView);
+            moveIn.setFromY(-20);
+            moveIn.setToY(0);
+            
+            javafx.animation.ParallelTransition animation = new javafx.animation.ParallelTransition(fadeIn, moveIn);
+            animation.setOnFinished(e -> {
+                // Update the full UI after animation completes
+                updateUI();
+                
+                // Update direction indicator
+                updateDirectionIndicator();
+                
+                // Update turn label
+                updateTurnLabel();
+                
+                // Check if an automatic move is needed for AI
+                handleAITurns();
+            });
+            
+            animation.play();
+        } else {
+            // If no card was drawn (e.g., draw pile is empty), still update the UI
+            updateUI();
+            updateDirectionIndicator();
+            updateTurnLabel();
+            handleAITurns();
+        }
     }
     
     /**
@@ -447,7 +543,7 @@ public class GameController {
                 return;
             }
             
-            // Update the UI
+            // Update the UI to show the new state
             updateUI();
             
             // Update direction indicator

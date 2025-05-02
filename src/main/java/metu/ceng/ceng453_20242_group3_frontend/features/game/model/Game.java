@@ -220,7 +220,8 @@ public class Game {
 
         // Select a random player to start
         currentPlayerIndex = random.nextInt(players.size());
-
+        // TODO: Remove this
+        currentPlayerIndex = 0;
         // Set the game as started
         gameStarted = true;
 
@@ -245,7 +246,10 @@ public class Game {
         }
         
         if (initialCard != null) {
+            // Create a fresh discard pile to ensure proper ordering
+            discardPile = new Deck();
             discardPile.addCard(initialCard);
+            System.out.println("Initial card placed on discard pile: " + initialCard);
         }
         
         return initialCard;
