@@ -16,3 +16,4 @@ The UI is designed with a modern gradient background (pink to orange for login, 
 If you need to create additional card images, place them in the src/main/resources/images/cards/ directory following the naming pattern:
 - For number cards: card-[number]-[color].png (e.g., card-5-blue.png)
 - For special cards: card-[type]-[color].png (e.g., card-skip-green.png, card-wild.png)
+
