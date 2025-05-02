@@ -36,6 +36,7 @@ import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Player;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.model.PlayerCount;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Direction;
 import metu.ceng.ceng453_20242_group3_frontend.features.common.util.SessionManager;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.view.CardRenderer;
 
 /**
  * Controller for the game view.
@@ -108,18 +109,11 @@ public class GameController {
     // Legacy fields to be removed after full refactoring
     private List<ComputerAIPlayer> aiPlayers = new ArrayList<>();
     
-    // Card colors for legacy code - will be removed in future refactoring
-    private final Color RED_COLOR = Color.rgb(227, 35, 45);
-    private final Color GREEN_COLOR = Color.rgb(67, 176, 71);
-    private final Color BLUE_COLOR = Color.rgb(0, 122, 193);
-    private final Color YELLOW_COLOR = Color.rgb(243, 206, 37);
+    // Store player area animations for control
+    private javafx.animation.Timeline[] playerAnimations;
     
-    // Action card icons
-    private final String SKIP_ICON = "⊘";
-    private final String REVERSE_ICON = "↺";
-    private final String DRAW_TWO_ICON = "+2";
-    private final String WILD_ICON = "★";
-    private final String WILD_DRAW_FOUR_ICON = "+4";
+    // Add a field to store the game table animation
+    private javafx.animation.Timeline gameTableAnimation;
     
     @FXML
     private void initialize() {
@@ -145,21 +139,13 @@ public class GameController {
      */
     public void initializeGame(String gameMode, int aiPlayerCount, int initialCardCount) {
         // Create PlayerCount enum
-        PlayerCount playerCount;
-        switch (aiPlayerCount + 1) { // +1 for human player
-            case 2:
-                playerCount = PlayerCount.TWO;
-                break;
-            case 3:
-                playerCount = PlayerCount.THREE;
-                break;
-            case 4:
-                playerCount = PlayerCount.FOUR;
-                break;
-            default:
-                playerCount = PlayerCount.TWO; // Default
-        }
-        
+        PlayerCount playerCount = switch (aiPlayerCount + 1) { // +1 for human player
+            case 2 -> PlayerCount.TWO;
+            case 3 -> PlayerCount.THREE;
+            case 4 -> PlayerCount.FOUR;
+            default -> PlayerCount.TWO;
+        };
+
         // Create a new game instance
         this.game = new Game(
             "multiplayer".equalsIgnoreCase(gameMode) ? GameMode.MULTIPLAYER : GameMode.SINGLEPLAYER,
@@ -203,6 +189,9 @@ public class GameController {
         
         // Update turn label
         updateTurnLabel();
+        
+        // Update player area animations
+        updatePlayerAreaAnimations();
     }
     
     /**
@@ -233,7 +222,7 @@ public class GameController {
             // Display AI cards (all other players)
             if (players.size() > 1) {
                 // Top opponent (always exists if there are AI players)
-                displayOpponentCards(1, topPlayerCardsContainer, false, 0);
+                displayOpponentCards(1, topPlayerCardsContainer, false, 180);
                 
                 // Left opponent (if there are at least 3 players total)
                 if (players.size() > 2) {
@@ -250,10 +239,8 @@ public class GameController {
         // Set up draw pile
         setupDrawPile();
         
-        // Set up discard pile if a card has been played
-        if (firstCardPlayed) {
-            setupDiscardPile();
-        }
+        // Always set up discard pile - will show empty placeholder if no card has been played
+        setupDiscardPile();
     }
     
     /**
@@ -284,23 +271,16 @@ public class GameController {
     }
     
     /**
-     * Sets up the draw pile in the UI
+     * Sets up the draw pile.
      */
     private void setupDrawPile() {
-        // Clear existing content
         drawPileContainer.getChildren().clear();
         
-        // Create card back for draw pile
-        StackPane cardView = createCardBackView();
-        drawPileContainer.getChildren().add(cardView);
+        // Create a card back view for the draw pile
+        StackPane cardBackView = CardRenderer.createCardBackView();
         
-        // Add draw pile label
-        Label pileLabel = new Label("DRAW PILE");
-        pileLabel.getStyleClass().add("card-pile-label");
-        drawPileContainer.getChildren().add(pileLabel);
-        
-        // Add click handler for drawing cards
-        cardView.setOnMouseClicked(event -> {
+        // Add click event to draw a card
+        cardBackView.setOnMouseClicked(event -> {
             // First click after game start should place initial card on discard pile
             if (!firstCardPlayed) {
                 startFirstCardPlay();
@@ -308,6 +288,13 @@ public class GameController {
                 drawCard();
             }
         });
+        
+        drawPileContainer.getChildren().add(cardBackView);
+        
+        // Add draw pile label
+        Label pileLabel = new Label("DRAW PILE");
+        pileLabel.getStyleClass().add("card-pile-label");
+        drawPileContainer.getChildren().add(pileLabel);
     }
     
     /**
@@ -377,37 +364,22 @@ public class GameController {
     }
     
     /**
-     * Sets up the discard pile in the UI
+     * Sets up the discard pile with the top card.
      */
     private void setupDiscardPile() {
-        // Clear existing content
         discardPileContainer.getChildren().clear();
         
         // Get the top card from the discard pile
         Card topCard = game.getDiscardPile().peekCard();
         
         if (topCard != null) {
-            // Create and add the top card view
-            StackPane cardView = createCardView(topCard);
+            // Create card view for top card
+            StackPane cardView = CardRenderer.createCardView(topCard);
             discardPileContainer.getChildren().add(cardView);
         } else {
-            // Create an empty discard pile placeholder when no cards are present
-            StackPane emptyPile = new StackPane();
-            emptyPile.setPrefSize(80, 120);
-            
-            Rectangle emptyRect = new Rectangle(80, 120);
-            emptyRect.setArcWidth(15);
-            emptyRect.setArcHeight(15);
-            emptyRect.setFill(Color.rgb(0, 50, 0, 0.5));
-            emptyRect.setStroke(Color.WHITE);
-            emptyRect.setStrokeWidth(2);
-            emptyRect.getStrokeDashArray().addAll(5.0, 5.0);
-            
-            Label emptyLabel = new Label("EMPTY");
-            emptyLabel.setTextFill(Color.WHITE);
-            
-            emptyPile.getChildren().addAll(emptyRect, emptyLabel);
-            discardPileContainer.getChildren().add(emptyPile);
+            // Create an empty placeholder if there's no card
+            StackPane emptyPlaceholder = CardRenderer.createEmptyCardPlaceholder();
+            discardPileContainer.getChildren().add(emptyPlaceholder);
         }
         
         // Add discard pile label
@@ -420,38 +392,24 @@ public class GameController {
      * Handles the action of drawing a card from the draw pile
      */
     private void drawCard() {
-        // Only allow drawing on the player's turn
-        if (game.getCurrentPlayerIndex() != 0) {
+        if (!isGameRunning || game == null) {
             return;
         }
         
         // Draw a card for the current player
         Card drawnCard = game.drawCardForCurrentPlayer();
         
-        if (drawnCard != null) {
-            // Add the card to the UI
-            StackPane cardView = createCardView(drawnCard);
-            cardView.setOnMouseClicked(event -> playCard(cardView, drawnCard));
-            
-            // Animate the card being drawn
-            cardView.setTranslateY(-50);
-            cardView.setOpacity(0);
-            
-            bottomPlayerCardsContainer.getChildren().add(cardView);
-            
-            javafx.animation.ParallelTransition pt = new javafx.animation.ParallelTransition(
-                new javafx.animation.TranslateTransition(Duration.millis(300), cardView),
-                new javafx.animation.FadeTransition(Duration.millis(300), cardView)
-            );
-            
-            ((javafx.animation.TranslateTransition)pt.getChildren().get(0)).setToY(0);
-            ((javafx.animation.FadeTransition)pt.getChildren().get(1)).setToValue(1);
-            
-            pt.play();
-            
-            // Update turn label
-            updateTurnLabel();
-        }
+        // Update UI
+        updateUI();
+        
+        // Update direction indicator
+        updateDirectionIndicator();
+        
+        // Update turn label
+        updateTurnLabel();
+        
+        // Handle AI turns if necessary
+        handleAITurns();
     }
     
     /**
@@ -461,492 +419,63 @@ public class GameController {
      * @return A StackPane containing the card visualization
      */
     private StackPane createCardView(Card card) {
-        // Always create cards programmatically for consistency
-        if (card.isNumberCard()) {
-            return createNumberCardView(card);
-        } else if (card.isWildCard()) {
-            if (card.getAction() == CardAction.WILD) {
-                return createWildCardView(card);
-            } else {
-                return createWildDrawFourCardView(card);
-            }
-        } else {
-            // Action cards: Skip, Reverse, Draw Two
-            return createActionCardView(card);
-        }
+        return CardRenderer.createCardView(card);
     }
     
     /**
-     * Creates a visual representation of a number card.
+     * Handles playing a card from the player's hand
      *
-     * @param card The card model to display
-     * @return A StackPane containing the card visualization
-     */
-    private StackPane createNumberCardView(Card card) {
-        StackPane cardView = new StackPane();
-        cardView.setPrefSize(80, 120);
-        cardView.getStyleClass().add("uno-card");
-        
-        Rectangle cardBase = new Rectangle(80, 120);
-        cardBase.setArcWidth(15);
-        cardBase.setArcHeight(15);
-        
-        // Determine color based on card color
-        Color cardColor = getColorFromCardColor(card.getColor());
-        
-        cardBase.setFill(cardColor);
-        cardBase.setStroke(Color.WHITE);
-        cardBase.setStrokeWidth(2);
-        
-        cardView.getChildren().add(cardBase);
-        
-        // Add white oval in the middle (UNO card style)
-        javafx.scene.shape.Ellipse whiteEllipse = new javafx.scene.shape.Ellipse(30, 45);
-        whiteEllipse.setFill(Color.WHITE);
-        whiteEllipse.setRotate(30);
-        
-        cardView.getChildren().add(whiteEllipse);
-        
-        // Add card value in center
-        String value = String.valueOf(card.getValue());
-        Label valueLabel = new Label(value);
-        valueLabel.setStyle("-fx-font-size: 36px; -fx-font-weight: bold;");
-        valueLabel.setTextFill(cardColor);
-        cardView.getChildren().add(valueLabel);
-        
-        // Add smaller value in top-left corner
-        Label topLeftLabel = new Label(value);
-        topLeftLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        topLeftLabel.setTextFill(Color.WHITE);
-        topLeftLabel.setTranslateX(-25);
-        topLeftLabel.setTranslateY(-45);
-        cardView.getChildren().add(topLeftLabel);
-        
-        // Add reflected value in bottom-right corner
-        Label bottomRightLabel = new Label(value);
-        bottomRightLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        bottomRightLabel.setTextFill(Color.WHITE);
-        bottomRightLabel.setTranslateX(25);
-        bottomRightLabel.setTranslateY(45);
-        bottomRightLabel.setRotate(180); // Rotate to create reflection effect
-        cardView.getChildren().add(bottomRightLabel);
-        
-        // Set appropriate style for playable cards
-        if (card.isPlayable()) {
-            cardView.setEffect(new javafx.scene.effect.DropShadow(15, Color.WHITE));
-            cardView.setStyle("-fx-cursor: hand;");
-        }
-        
-        return cardView;
-    }
-    
-    /**
-     * Creates a visual representation of an action card.
-     *
-     * @param card The card model to display
-     * @return A StackPane containing the card visualization
-     */
-    private StackPane createActionCardView(Card card) {
-        StackPane cardView = new StackPane();
-        cardView.setPrefSize(80, 120);
-        cardView.getStyleClass().add("uno-card");
-        
-        Rectangle cardBase = new Rectangle(80, 120);
-        cardBase.setArcWidth(15);
-        cardBase.setArcHeight(15);
-        
-        // Determine color based on card color
-        Color cardColor = getColorFromCardColor(card.getColor());
-        
-        cardBase.setFill(cardColor);
-        cardBase.setStroke(Color.WHITE);
-        cardBase.setStrokeWidth(2);
-        
-        cardView.getChildren().add(cardBase);
-        
-        // Add white oval in the middle (UNO card style)
-        javafx.scene.shape.Ellipse whiteEllipse = new javafx.scene.shape.Ellipse(30, 45);
-        whiteEllipse.setFill(Color.WHITE);
-        whiteEllipse.setRotate(30);
-        
-        cardView.getChildren().add(whiteEllipse);
-        
-        // Add card action name and icon
-        String actionText = "";
-        String actionIcon = card.getAction().getSymbol();
-        
-        switch (card.getAction()) {
-            case SKIP:
-                actionText = "SKIP";
-                break;
-            case REVERSE:
-                actionText = "REV";
-                break;
-            case DRAW_TWO:
-                actionText = "DRAW";
-                break;
-            default:
-                actionText = card.getAction().name();
-                break;
-        }
-        
-        // Add icon
-        Label iconLabel = new Label(actionIcon);
-        iconLabel.setStyle("-fx-font-size: 38px; -fx-font-weight: bold;");
-        iconLabel.setTextFill(cardColor);
-        cardView.getChildren().add(iconLabel);
-        
-        // Add text below icon
-        Label textLabel = new Label(actionText);
-        textLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
-        textLabel.setTextFill(cardColor);
-        textLabel.setTranslateY(30);
-        cardView.getChildren().add(textLabel);
-        
-        // Add smaller icon in top-left corner
-        Label topLeftLabel = new Label(actionIcon);
-        topLeftLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        topLeftLabel.setTextFill(Color.WHITE);
-        topLeftLabel.setTranslateX(-25);
-        topLeftLabel.setTranslateY(-45);
-        cardView.getChildren().add(topLeftLabel);
-        
-        // Add reflected icon in bottom-right corner
-        Label bottomRightLabel = new Label(actionIcon);
-        bottomRightLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        bottomRightLabel.setTextFill(Color.WHITE);
-        bottomRightLabel.setTranslateX(25);
-        bottomRightLabel.setTranslateY(45);
-        bottomRightLabel.setRotate(180);
-        cardView.getChildren().add(bottomRightLabel);
-        
-        // Set appropriate style for playable cards
-        if (card.isPlayable()) {
-            cardView.setEffect(new javafx.scene.effect.DropShadow(15, Color.WHITE));
-            cardView.setStyle("-fx-cursor: hand;");
-        }
-        
-        return cardView;
-    }
-    
-    /**
-     * Creates a visual representation of a wild card.
-     *
-     * @param card The card model to display
-     * @return A StackPane containing the card visualization
-     */
-    private StackPane createWildCardView(Card card) {
-        StackPane cardView = new StackPane();
-        cardView.setPrefSize(80, 120);
-        cardView.getStyleClass().add("uno-card");
-        
-        // Wild card - create multicolored design
-        Rectangle wildCardBase = new Rectangle(80, 120);
-        wildCardBase.setArcWidth(15);
-        wildCardBase.setArcHeight(15);
-        wildCardBase.setFill(Color.BLACK);
-        
-        cardView.getChildren().add(wildCardBase);
-        
-        // Create the wild card circle with segments
-        double centerX = 40;
-        double centerY = 60;
-        double radius = 30;
-        
-        // Red segment (top-left)
-        javafx.scene.shape.Arc redSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 135, 90);
-        redSegment.setType(javafx.scene.shape.ArcType.ROUND);
-        redSegment.setFill(RED_COLOR);
-        
-        // Blue segment (top-right)
-        javafx.scene.shape.Arc blueSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 45, 90);
-        blueSegment.setType(javafx.scene.shape.ArcType.ROUND);
-        blueSegment.setFill(BLUE_COLOR);
-        
-        // Yellow segment (bottom-right)
-        javafx.scene.shape.Arc yellowSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, -45, 90);
-        yellowSegment.setType(javafx.scene.shape.ArcType.ROUND);
-        yellowSegment.setFill(YELLOW_COLOR);
-        
-        // Green segment (bottom-left)
-        javafx.scene.shape.Arc greenSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 225, 90);
-        greenSegment.setType(javafx.scene.shape.ArcType.ROUND);
-        greenSegment.setFill(GREEN_COLOR);
-        
-        cardView.getChildren().addAll(redSegment, blueSegment, yellowSegment, greenSegment);
-        
-        // Add wild star icon
-        Label iconLabel = new Label("★");
-        iconLabel.setStyle("-fx-font-size: 36px; -fx-font-weight: bold;");
-        iconLabel.setTextFill(Color.WHITE);
-        iconLabel.setTranslateY(-15);
-        cardView.getChildren().add(iconLabel);
-        
-        // Add "WILD" text
-        Label wildLabel = new Label("WILD");
-        wildLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
-        wildLabel.setTextFill(Color.WHITE);
-        wildLabel.setTranslateY(20);
-        cardView.getChildren().add(wildLabel);
-        
-        // Add "W" in top-left corner
-        Label topLeftLabel = new Label("W");
-        topLeftLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        topLeftLabel.setTextFill(Color.WHITE);
-        topLeftLabel.setTranslateX(-25);
-        topLeftLabel.setTranslateY(-45);
-        cardView.getChildren().add(topLeftLabel);
-        
-        // Add reflected "W" in bottom-right corner
-        Label bottomRightLabel = new Label("W");
-        bottomRightLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        bottomRightLabel.setTextFill(Color.WHITE);
-        bottomRightLabel.setTranslateX(25);
-        bottomRightLabel.setTranslateY(45);
-        bottomRightLabel.setRotate(180);
-        cardView.getChildren().add(bottomRightLabel);
-        
-        // Set appropriate style for playable cards
-        if (card.isPlayable()) {
-            cardView.setEffect(new javafx.scene.effect.DropShadow(15, Color.WHITE));
-            cardView.setStyle("-fx-cursor: hand;");
-        }
-        
-        return cardView;
-    }
-    
-    /**
-     * Creates a visual representation of a Wild Draw Four card.
-     *
-     * @param card The card model to display
-     * @return A StackPane containing the card visualization
-     */
-    private StackPane createWildDrawFourCardView(Card card) {
-        StackPane cardView = new StackPane();
-        cardView.setPrefSize(80, 120);
-        cardView.getStyleClass().add("uno-card");
-        
-        // Wild card - create multicolored design
-        Rectangle wildCardBase = new Rectangle(80, 120);
-        wildCardBase.setArcWidth(15);
-        wildCardBase.setArcHeight(15);
-        wildCardBase.setFill(Color.BLACK);
-        
-        cardView.getChildren().add(wildCardBase);
-        
-        // Create the wild card circle with segments
-        double centerX = 40;
-        double centerY = 60;
-        double radius = 30;
-        
-        // Red segment (top-left)
-        javafx.scene.shape.Arc redSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 135, 90);
-        redSegment.setType(javafx.scene.shape.ArcType.ROUND);
-        redSegment.setFill(RED_COLOR);
-        
-        // Blue segment (top-right)
-        javafx.scene.shape.Arc blueSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 45, 90);
-        blueSegment.setType(javafx.scene.shape.ArcType.ROUND);
-        blueSegment.setFill(BLUE_COLOR);
-        
-        // Yellow segment (bottom-right)
-        javafx.scene.shape.Arc yellowSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, -45, 90);
-        yellowSegment.setType(javafx.scene.shape.ArcType.ROUND);
-        yellowSegment.setFill(YELLOW_COLOR);
-        
-        // Green segment (bottom-left)
-        javafx.scene.shape.Arc greenSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 225, 90);
-        greenSegment.setType(javafx.scene.shape.ArcType.ROUND);
-        greenSegment.setFill(GREEN_COLOR);
-        
-        cardView.getChildren().addAll(redSegment, blueSegment, yellowSegment, greenSegment);
-        
-        // Add "+4" icon
-        Label iconLabel = new Label("+4");
-        iconLabel.setStyle("-fx-font-size: 36px; -fx-font-weight: bold;");
-        iconLabel.setTextFill(Color.WHITE);
-        iconLabel.setTranslateY(-15);
-        cardView.getChildren().add(iconLabel);
-        
-        // Add "WILD +4" text
-        Label wildLabel = new Label("WILD +4");
-        wildLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
-        wildLabel.setTextFill(Color.WHITE);
-        wildLabel.setTranslateY(20);
-        cardView.getChildren().add(wildLabel);
-        
-        // Add "+4" in top-left corner
-        Label topLeftLabel = new Label("+4");
-        topLeftLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        topLeftLabel.setTextFill(Color.WHITE);
-        topLeftLabel.setTranslateX(-25);
-        topLeftLabel.setTranslateY(-45);
-        cardView.getChildren().add(topLeftLabel);
-        
-        // Add reflected "+4" in bottom-right corner
-        Label bottomRightLabel = new Label("+4");
-        bottomRightLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        bottomRightLabel.setTextFill(Color.WHITE);
-        bottomRightLabel.setTranslateX(25);
-        bottomRightLabel.setTranslateY(45);
-        bottomRightLabel.setRotate(180);
-        cardView.getChildren().add(bottomRightLabel);
-        
-        // Set appropriate style for playable cards
-        if (card.isPlayable()) {
-            cardView.setEffect(new javafx.scene.effect.DropShadow(15, Color.WHITE));
-            cardView.setStyle("-fx-cursor: hand;");
-        }
-        
-        return cardView;
-    }
-    
-    /**
-     * Creates a card back for opponent cards.
-     *
-     * @return A StackPane representing the card back
-     */
-    private StackPane createCardBackView() {
-        StackPane cardView = new StackPane();
-        cardView.setPrefSize(80, 120);
-        cardView.getStyleClass().add("uno-card");
-        
-        // Create card back directly without trying to load images
-        Rectangle cardBack = new Rectangle(80, 120);
-        cardBack.setArcWidth(15);
-        cardBack.setArcHeight(15);
-        cardBack.setFill(Color.valueOf("#D32F2F")); // UNO red for card back
-        cardBack.setStroke(Color.WHITE);
-        cardBack.setStrokeWidth(3);
-        cardView.getChildren().add(cardBack);
-        
-        // Create an oval for the UNO logo background
-        javafx.scene.shape.Ellipse logoBackground = new javafx.scene.shape.Ellipse(35, 25);
-        logoBackground.setFill(Color.WHITE);
-        logoBackground.setRotate(-20);
-        cardView.getChildren().add(logoBackground);
-        
-        // Add the UNO logo
-        Label unoLabel = new Label("UNO");
-        unoLabel.setStyle("-fx-font-size: 28px; -fx-font-weight: bold;");
-        unoLabel.setTextFill(Color.valueOf("#D32F2F")); // Match the card back color
-        cardView.getChildren().add(unoLabel);
-        
-        // Add a border around the UNO text
-        javafx.scene.shape.Ellipse logoBorder = new javafx.scene.shape.Ellipse(35, 25);
-        logoBorder.setFill(Color.TRANSPARENT);
-        logoBorder.setStroke(Color.BLACK);
-        logoBorder.setStrokeWidth(1);
-        logoBorder.setRotate(-20);
-        cardView.getChildren().add(logoBorder);
-        
-        return cardView;
-    }
-    
-    /**
-     * Helper method to convert CardColor to JavaFX Color.
-     *
-     * @param cardColor The CardColor enum value
-     * @return The corresponding JavaFX Color
-     */
-    private Color getColorFromCardColor(CardColor cardColor) {
-        switch (cardColor) {
-            case RED:
-                return RED_COLOR;
-            case GREEN:
-                return GREEN_COLOR;
-            case BLUE:
-                return BLUE_COLOR;
-            case YELLOW:
-                return YELLOW_COLOR;
-            case MULTI:
-                return Color.BLACK;
-            default:
-                return Color.BLACK;
-        }
-    }
-    
-    /**
-     * Handles a card being played by the user
-     *
-     * @param cardView The card view that was clicked
-     * @param card The card model that was played
+     * @param cardView The card view in the UI
+     * @param card The card model being played
      */
     private void playCard(StackPane cardView, Card card) {
-        // Check if a card has been placed on the discard pile to start the game
-        if (!firstCardPlayed) {
-            startFirstCardPlay();
+        // Only allow playing cards on the player's turn
+        if (game.getCurrentPlayerIndex() != 0 || !isGameRunning) {
             return;
         }
         
-        // Check if it's the player's turn
-        if (game.getCurrentPlayerIndex() != 0) {
-            return;
-        }
+        // Try to play the card
+        boolean playSuccessful = game.playCard(card);
         
-        // Check if the card can be played
-        Card topCard = game.getDiscardPile().peekCard();
-        if (topCard != null && !card.canPlayOn(topCard)) {
-            // Card cannot be played, show feedback
-            javafx.scene.effect.Glow glow = new javafx.scene.effect.Glow(0.8);
-            cardView.setEffect(glow);
+        if (playSuccessful) {
+            // Set the first card played flag
+            firstCardPlayed = true;
             
-            javafx.animation.Timeline timeline = new javafx.animation.Timeline(
-                new javafx.animation.KeyFrame(Duration.ZERO, 
-                    new javafx.animation.KeyValue(glow.levelProperty(), 0.8)),
-                new javafx.animation.KeyFrame(Duration.millis(200), 
-                    new javafx.animation.KeyValue(glow.levelProperty(), 0)),
-                new javafx.animation.KeyFrame(Duration.millis(400), 
-                    new javafx.animation.KeyValue(glow.levelProperty(), 0.8)),
-                new javafx.animation.KeyFrame(Duration.millis(600), 
-                    new javafx.animation.KeyValue(glow.levelProperty(), 0))
-            );
-            
-            timeline.play();
-            return;
-        }
-        
-        // Play the card through the game model
-        boolean success = game.playCard(card);
-        if (!success) {
-            return; // Card couldn't be played due to game rules
-        }
-        
-        // Remove the card from the player's hand in UI
-        bottomPlayerCardsContainer.getChildren().remove(cardView);
-        
-        // Add animation for card being played
-        javafx.animation.TranslateTransition tt = new javafx.animation.TranslateTransition(Duration.millis(300), cardView);
-        tt.setToY(-100);
-        tt.setOnFinished(event -> {
-            // Update the discard pile
-            setupDiscardPile();
-            
-            // Check for game ending conditions (empty hand)
-            if (game.isGameEnded() && game.getWinner() != null) {
-                handleGameEnd(game.getWinner().equals(game.getPlayers().get(0))); // True if human player won
+            // Check if the game has ended
+            if (game.isGameEnded()) {
+                handleGameEnd(true); // Human player won
                 return;
             }
             
-            // Update direction indicator if a reverse card was played
+            // Update the UI
+            updateUI();
+            
+            // Update direction indicator
             updateDirectionIndicator();
             
-            // Update the turn label
+            // Update turn label
             updateTurnLabel();
             
-            // Handle AI turns
+            // Update player area animations
+            updatePlayerAreaAnimations();
+            
+            // Check if it's AI's turn and handle it
             handleAITurns();
-        });
-        tt.play();
+        }
     }
     
     /**
-     * Handles AI player turns
+     * Handles AI turns when it's an AI player's turn
      */
     private void handleAITurns() {
-        if (game.getCurrentPlayerIndex() > 0 && game.getCurrentPlayerIndex() < game.getPlayers().size()) {
-            // It's an AI player's turn
-            simpleAITurn(game.getCurrentPlayerIndex() - 1);
+        if (!isGameRunning || game == null) {
+            return;
+        }
+        
+        // If it's AI's turn, trigger AI move
+        int currentPlayerIndex = game.getCurrentPlayerIndex();
+        if (currentPlayerIndex > 0) { // Player at index 0 is always human
+            simpleAITurn(currentPlayerIndex - 1); // -1 because AI index in aiPlayers starts from 0
         }
     }
     
@@ -964,51 +493,85 @@ public class GameController {
     }
     
     /**
-     * Updates the turn label to show which player's turn it is
+     * Updates the current turn label based on the active player
      */
     private void updateTurnLabel() {
-        int currentPlayerIndex = game.getCurrentPlayerIndex();
-        List<Player> players = game.getPlayers();
-        
-        if (currentPlayerIndex >= 0 && currentPlayerIndex < players.size()) {
-            Player currentPlayer = players.get(currentPlayerIndex);
-            
-            if (currentPlayerIndex == 0) {
-                // Local player's turn
-                currentTurnLabel.setText("YOUR TURN");
-                currentTurnLabel.setStyle("-fx-background-color: rgba(0, 153, 51, 0.8);"); // Green for player
-            } else {
-                // AI player's turn
-                currentTurnLabel.setText(currentPlayer.getName() + "'S TURN");
-                currentTurnLabel.setStyle("-fx-background-color: rgba(204, 51, 0, 0.8);"); // Red for opponent
-            }
-        }
-    }
-    
-    /**
-     * Simulates an AI player's turn with a delay
-     * 
-     * @param aiIndex The index of the AI player
-     */
-    private void simpleAITurn(int aiIndex) {
-        if (aiIndex < 0 || aiIndex >= aiPlayers.size()) {
+        if (game == null) {
             return;
         }
         
-        ComputerAIPlayer ai = aiPlayers.get(aiIndex);
+        Player currentPlayer = game.getCurrentPlayer();
+        if (currentPlayer == null) {
+            return;
+        }
         
-        // Get the AI thinking time
-        int thinkTime = ai.takeTurn();
+        // Current player is the human player (always at index 0)
+        if (game.getCurrentPlayerIndex() == 0) {
+            currentTurnLabel.setText("YOUR TURN");
+            currentTurnLabel.setStyle("-fx-background-color: rgba(0, 153, 51, 0.8);"); // Green for player's turn
+        } else {
+            currentTurnLabel.setText(currentPlayer.getName() + "'S TURN");
+            currentTurnLabel.setStyle("-fx-background-color: rgba(217, 83, 79, 0.8);"); // Red for opponent's turn
+        }
         
-        // Use JavaFX animation to delay the turn
-        javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.millis(thinkTime));
+        // Update which player area is pulsing
+        updatePlayerAreaAnimations();
+    }
+    
+    /**
+     * Performs a simple AI turn for the specified AI player
+     * 
+     * @param aiIndex The index of the AI player in the aiPlayers list
+     */
+    private void simpleAITurn(int aiIndex) {
+        if (!isGameRunning || game == null) {
+            return;
+        }
+        
+        // Wait a moment before AI plays (for better user experience)
+        javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(1));
         pause.setOnFinished(event -> {
-            // AI completes turn
-            ai.finishTurn();
+            // Find the first playable card in the AI's hand
+            boolean cardPlayed = false;
+            Player aiPlayer = game.getCurrentPlayer();
             
-            // Advance to next player
-            nextTurn();
+            if (aiPlayer != null && aiPlayer.isAI()) {
+                for (Card card : aiPlayer.getHand()) {
+                    if (card.isPlayable()) {
+                        game.playCard(card);
+                        cardPlayed = true;
+                        break;
+                    }
+                }
+                
+                // If no card can be played, draw a card
+                if (!cardPlayed) {
+                    game.drawCardForCurrentPlayer();
+                }
+                
+                // Update UI
+                updateUI();
+                
+                // Update direction indicator
+                updateDirectionIndicator();
+                
+                // Update turn label
+                updateTurnLabel();
+                
+                // Update player area animations
+                updatePlayerAreaAnimations();
+                
+                // If the AI turn resulted in game end
+                if (game.isGameEnded()) {
+                    handleGameEnd(false); // AI player won
+                    return;
+                }
+                
+                // If the next player is also AI, continue the chain
+                handleAITurns();
+            }
         });
+        
         pause.play();
     }
     
@@ -1060,12 +623,37 @@ public class GameController {
     }
     
     /**
-     * Sets up subtle animations for the game table to enhance visual appeal
+     * Sets up subtle animations for the game players areas
      */
     private void setupGameTableAnimations() {
-        // Find the game table element
-        javafx.scene.Node gameTable = null;
+        // Create animation timelines for each player area
+        javafx.animation.Timeline bottomPlayerAnimation = createPulseAnimation(bottomPlayerArea);
+        javafx.animation.Timeline topPlayerAnimation = createPulseAnimation(topPlayerArea);
+        javafx.animation.Timeline leftPlayerAnimation = createPulseAnimation(leftPlayerArea);
+        javafx.animation.Timeline rightPlayerAnimation = createPulseAnimation(rightPlayerArea);
         
+        // Store animations for later control
+        playerAnimations = new javafx.animation.Timeline[] {
+            bottomPlayerAnimation, topPlayerAnimation, leftPlayerAnimation, rightPlayerAnimation
+        };
+        
+        // Find the game table element
+        javafx.scene.Node gameTable = findGameTable();
+        
+        // Create the table animation if the table was found
+        if (gameTable != null) {
+            // Use the same animation timing as player animations for sync
+            gameTableAnimation = createPulseAnimation(gameTable);
+            gameTableAnimation.pause(); // Start paused
+        }
+    }
+    
+    /**
+     * Finds the game table element in the scene graph
+     * 
+     * @return The game table node or null if not found
+     */
+    private javafx.scene.Node findGameTable() {
         // Look through the StackPane in the center of the grid
         for (javafx.scene.Node node : gamePane.getChildrenUnmodifiable()) {
             if (node instanceof javafx.scene.layout.GridPane) {
@@ -1084,8 +672,7 @@ public class GameController {
                             for (javafx.scene.Node tableCandidate : centerPane.getChildren()) {
                                 if (tableCandidate instanceof javafx.scene.layout.StackPane &&
                                     tableCandidate.getStyleClass().contains("game-table")) {
-                                    gameTable = tableCandidate;
-                                    break;
+                                    return tableCandidate;
                                 }
                             }
                         }
@@ -1093,35 +680,81 @@ public class GameController {
                 }
             }
         }
+        return null;
+    }
+    
+    /**
+     * Creates a pulsing animation for a node
+     * 
+     * @param node The node to animate
+     * @return The animation timeline
+     */
+    private javafx.animation.Timeline createPulseAnimation(javafx.scene.Node node) {
+        // Gold color for the glow effect
+        javafx.scene.paint.Color glowColor = javafx.scene.paint.Color.rgb(255, 215, 0, 0.7);
         
-        // Create pulsing animation for the game table
-        if (gameTable != null) {
-            javafx.scene.Node finalGameTable = gameTable;
-            
-            // Create a pulsing glow effect
-            javafx.animation.Timeline pulseAnimation = new javafx.animation.Timeline(
-                new javafx.animation.KeyFrame(javafx.util.Duration.ZERO, 
-                    new javafx.animation.KeyValue(
-                        finalGameTable.effectProperty(),
-                        new javafx.scene.effect.DropShadow(15, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7))
-                    )
-                ),
-                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1.5), 
-                    new javafx.animation.KeyValue(
-                        finalGameTable.effectProperty(),
-                        new javafx.scene.effect.DropShadow(25, javafx.scene.paint.Color.rgb(255, 255, 255, 0.3))
-                    )
-                ),
-                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(3), 
-                    new javafx.animation.KeyValue(
-                        finalGameTable.effectProperty(),
-                        new javafx.scene.effect.DropShadow(15, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7))
-                    )
+        // Create a pulsing glow effect with consistent timing for all elements
+        javafx.animation.Timeline pulseAnimation = new javafx.animation.Timeline(
+            new javafx.animation.KeyFrame(javafx.util.Duration.ZERO, 
+                new javafx.animation.KeyValue(
+                    node.effectProperty(),
+                    new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7))
                 )
-            );
+            ),
+            new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1.0), 
+                new javafx.animation.KeyValue(
+                    node.effectProperty(),
+                    new javafx.scene.effect.DropShadow(20, glowColor)
+                )
+            ),
+            new javafx.animation.KeyFrame(javafx.util.Duration.seconds(2.0), 
+                new javafx.animation.KeyValue(
+                    node.effectProperty(),
+                    new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7))
+                )
+            )
+        );
+        
+        pulseAnimation.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        // Start paused - will be activated only for current player
+        pulseAnimation.pause();
+        
+        return pulseAnimation;
+    }
+    
+    /**
+     * Updates which player area is pulsing based on the current player.
+     */
+    private void updatePlayerAreaAnimations() {
+        if (playerAnimations == null || game == null) {
+            return;
+        }
+        
+        // Stop all animations
+        for (javafx.animation.Timeline animation : playerAnimations) {
+            animation.pause();
+        }
+        
+        // Stop game table animation
+        if (gameTableAnimation != null) {
+            gameTableAnimation.pause();
+        }
+        
+        // Set basic shadow for all player areas
+        bottomPlayerArea.setEffect(new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7)));
+        topPlayerArea.setEffect(new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7)));
+        leftPlayerArea.setEffect(new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7)));
+        rightPlayerArea.setEffect(new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7)));
+        
+        // Start the animation for the current player's area
+        int currentPlayerIndex = game.getCurrentPlayerIndex();
+        if (currentPlayerIndex >= 0 && currentPlayerIndex < playerAnimations.length) {
+            playerAnimations[currentPlayerIndex].play();
             
-            pulseAnimation.setCycleCount(javafx.animation.Animation.INDEFINITE);
-            pulseAnimation.play();
+            // Also pulse the game table if it's the human player's turn (index 0)
+            if (currentPlayerIndex == 0 && gameTableAnimation != null) {
+                gameTableAnimation.play();
+            }
         }
     }
     

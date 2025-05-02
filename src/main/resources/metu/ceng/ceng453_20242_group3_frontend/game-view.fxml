@@ -52,7 +52,7 @@
         <!-- Top Player (Opponent 1) -->
         <VBox fx:id="topPlayerArea" alignment="CENTER" styleClass="player-area" 
               GridPane.columnIndex="1" GridPane.rowIndex="0">
-            <Label fx:id="topPlayerNameLabel" styleClass="player-name-label" text="Opponent 1" />
+            <Label fx:id="topPlayerNameLabel" styleClass="player-name-label" id="topPlayerLabel" text="Opponent 1" />
             <HBox fx:id="topPlayerCardsContainer" alignment="CENTER" spacing="-25.0" 
                   styleClass="opponent-cards-container" />
         </VBox>
