@@ -18,6 +18,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import metu.ceng.ceng453_20242_group3_frontend.service.AuthService;
+import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
 
 /**
  * Controller for the registration view.
@@ -199,7 +200,7 @@ public class RegisterController {
             Scene scene = new Scene(root);
             
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
                 System.out.println("CSS styling applied successfully");
@@ -235,30 +236,22 @@ public class RegisterController {
     private void navigateToLogin() {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/login-view.fxml"));
-            Parent root = loader.load();
+            Scene scene = new Scene(loader.load(), AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT);
             
-            Scene scene = new Scene(root);
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
             
+            // Set up keyboard shortcuts for full screen mode
+            setupFullScreenShortcuts(scene);
+            
+            // Set the scene on the stage
             Stage stage = (Stage) registerPane.getScene().getWindow();
-            
-            // Add keyboard shortcuts for full screen mode
-            scene.setOnKeyPressed(e -> {
-                if (e.getCode() == KeyCode.F11) {
-                    stage.setFullScreen(!stage.isFullScreen());
-                } else if (e.getCode() == KeyCode.ENTER && e.isAltDown()) {
-                    stage.setFullScreen(!stage.isFullScreen());
-                }
-            });
-            
             stage.setScene(scene);
         } catch (IOException e) {
-            showAlert(Alert.AlertType.ERROR, "Navigation Error", 
-                      "Could not navigate to login page: " + e.getMessage());
+            showErrorAlert("Navigation Error", "Could not navigate to login page: " + e.getMessage());
         }
     }
     
@@ -275,5 +268,25 @@ public class RegisterController {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+    
+    /**
+     * Sets up keyboard shortcuts for full screen mode on the given scene.
+     * 
+     * @param scene The scene to set up shortcuts for
+     */
+    private void setupFullScreenShortcuts(Scene scene) {
+        Stage stage = (Stage) registerPane.getScene().getWindow();
+        scene.setOnKeyPressed(ke -> {
+            if (ke.getCode() == KeyCode.F11) {
+                stage.setFullScreen(!stage.isFullScreen());
+            } else if (ke.getCode() == KeyCode.ENTER && ke.isAltDown()) {
+                stage.setFullScreen(!stage.isFullScreen());
+            }
+        });
+    }
+    
+    private void showErrorAlert(String title, String message) {
+        showAlert(Alert.AlertType.ERROR, title, message);
     }
 } 

@@ -19,6 +19,10 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import metu.ceng.ceng453_20242_group3_frontend.service.AuthService;
+import javafx.scene.input.KeyCode;
+import javafx.stage.Stage;
+import metu.ceng.ceng453_20242_group3_frontend.UnoApplication;
+import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
 
 /**
  * Controller for the login view.
@@ -98,7 +102,7 @@ public class LoginController {
             
             Scene scene = new Scene(root);
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
@@ -166,7 +170,7 @@ public class LoginController {
             
             Scene scene = new Scene(root);
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
@@ -201,7 +205,7 @@ public class LoginController {
             
             Scene scene = new Scene(root);
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
@@ -246,7 +250,7 @@ public class LoginController {
             Scene scene = new Scene(root);
             
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
                 System.out.println("CSS styling applied successfully");
@@ -288,6 +292,78 @@ public class LoginController {
      */
     private void showAlert(Alert.AlertType type, String title, String message) {
         Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    @FXML
+    private void onRegisterLinkClicked() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/register-view.fxml"));
+            Scene scene = new Scene(loader.load(), AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT);
+            
+            // Add CSS styling
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
+            // Set up keyboard shortcuts
+            scene.setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.F11) {
+                    UnoApplication.getInstance().getPrimaryStage().setFullScreen(
+                        !UnoApplication.getInstance().getPrimaryStage().isFullScreen());
+                } else if (e.getCode() == KeyCode.ENTER && e.isAltDown()) {
+                    UnoApplication.getInstance().getPrimaryStage().setFullScreen(
+                        !UnoApplication.getInstance().getPrimaryStage().isFullScreen());
+                }
+            });
+            
+            // Set the scene
+            UnoApplication.getInstance().getPrimaryStage().setScene(scene);
+        } catch (Exception e) {
+            System.err.println("Error loading register view: " + e.getMessage());
+            e.printStackTrace();
+            showErrorAlert("Application Error", "Failed to load the registration screen. Please try again.");
+        }
+    }
+
+    @FXML
+    private void onForgotPasswordClicked() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/forgot-password-view.fxml"));
+            Scene scene = new Scene(loader.load(), AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT);
+            
+            // Add CSS styling
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
+            // Set up keyboard shortcuts
+            scene.setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.F11) {
+                    UnoApplication.getInstance().getPrimaryStage().setFullScreen(
+                        !UnoApplication.getInstance().getPrimaryStage().isFullScreen());
+                } else if (e.getCode() == KeyCode.ENTER && e.isAltDown()) {
+                    UnoApplication.getInstance().getPrimaryStage().setFullScreen(
+                        !UnoApplication.getInstance().getPrimaryStage().isFullScreen());
+                }
+            });
+            
+            // Set the scene
+            UnoApplication.getInstance().getPrimaryStage().setScene(scene);
+        } catch (Exception e) {
+            System.err.println("Error loading forgot password view: " + e.getMessage());
+            e.printStackTrace();
+            showErrorAlert("Application Error", "Failed to load the forgot password screen. Please try again.");
+        }
+    }
+
+    private void showErrorAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);

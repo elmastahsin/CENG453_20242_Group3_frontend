@@ -19,6 +19,8 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import metu.ceng.ceng453_20242_group3_frontend.service.AuthService;
+import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
+import metu.ceng.ceng453_20242_group3_frontend.UnoApplication;
 
 /**
  * Controller for the reset password view that appears after clicking the reset link.
@@ -165,38 +167,22 @@ public class ResetPasswordController {
     private void navigateToLogin() {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/login-view.fxml"));
-            Parent root = loader.load();
+            Scene scene = new Scene(loader.load(), AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT);
             
-            Scene scene = new Scene(root);
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
             
-            Stage stage = (Stage) resetPasswordPane.getScene().getWindow();
+            // Set up keyboard shortcuts
+            setupFullScreenShortcuts(scene);
             
-            // Create fade-out transition
-            FadeTransition fadeOut = new FadeTransition(Duration.millis(300), resetPasswordPane);
-            fadeOut.setFromValue(1.0);
-            fadeOut.setToValue(0.0);
-            fadeOut.setOnFinished(e -> {
-                // Add keyboard shortcuts for full screen mode
-                scene.setOnKeyPressed(ke -> {
-                    if (ke.getCode() == KeyCode.F11) {
-                        stage.setFullScreen(!stage.isFullScreen());
-                    } else if (ke.getCode() == KeyCode.ENTER && ke.isAltDown()) {
-                        stage.setFullScreen(!stage.isFullScreen());
-                    }
-                });
-                
-                stage.setScene(scene);
-            });
-            fadeOut.play();
-            
-        } catch (IOException e) {
-            showAlert(Alert.AlertType.ERROR, "Navigation Error", 
-                      "Could not navigate to login page: " + e.getMessage());
+            // Set the scene
+            UnoApplication.getInstance().getPrimaryStage().setScene(scene);
+        } catch (Exception e) {
+            e.printStackTrace();
+            showErrorAlert("Navigation Error", "Failed to navigate to the login screen. Please restart the application.");
         }
     }
     
@@ -213,5 +199,31 @@ public class ResetPasswordController {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+    
+    /**
+     * Sets up full screen shortcuts for the given scene.
+     * 
+     * @param scene The scene to set up full screen shortcuts for
+     */
+    private void setupFullScreenShortcuts(Scene scene) {
+        Stage stage = (Stage) resetPasswordPane.getScene().getWindow();
+        scene.setOnKeyPressed(ke -> {
+            if (ke.getCode() == KeyCode.F11) {
+                stage.setFullScreen(!stage.isFullScreen());
+            } else if (ke.getCode() == KeyCode.ENTER && ke.isAltDown()) {
+                stage.setFullScreen(!stage.isFullScreen());
+            }
+        });
+    }
+    
+    /**
+     * Shows an error alert dialog.
+     * 
+     * @param title The alert title
+     * @param message The alert message
+     */
+    private void showErrorAlert(String title, String message) {
+        showAlert(Alert.AlertType.ERROR, title, message);
     }
 } 

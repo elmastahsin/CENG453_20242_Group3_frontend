@@ -128,24 +128,24 @@ public class MainMenuController {
      */
     private void startGame() {
         try {
-            // Load the game view
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/game-view.fxml"));
+            // Load the game mode selection view instead of directly going to game view
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/game-mode-view.fxml"));
             Parent root = loader.load();
             
             // Get the current stage
             Stage stage = (Stage) mainMenuPane.getScene().getWindow();
             
             // Set the new scene
-            Scene gameScene = new Scene(root);
+            Scene gameModeScene = new Scene(root);
             
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
-                gameScene.getStylesheets().add(cssUrl.toExternalForm());
+                gameModeScene.getStylesheets().add(cssUrl.toExternalForm());
             }
             
             // Add keyboard shortcuts for full screen in game scene
-            gameScene.setOnKeyPressed(e -> {
+            gameModeScene.setOnKeyPressed(e -> {
                 if (e.getCode() == KeyCode.F11) {
                     stage.setFullScreen(!stage.isFullScreen());
                 } else if (e.getCode() == KeyCode.ENTER && e.isAltDown()) {
@@ -153,14 +153,22 @@ public class MainMenuController {
                 }
             });
             
-            stage.setScene(gameScene);
+            // Apply fade transition for smooth navigation
+            root.setOpacity(0);
+            stage.setScene(gameModeScene);
             
-            System.out.println("Starting new game...");
+            // Create and play fade-in transition
+            FadeTransition fadeIn = new FadeTransition(Duration.millis(400), root);
+            fadeIn.setFromValue(0.0);
+            fadeIn.setToValue(1.0);
+            fadeIn.play();
+            
+            System.out.println("Navigating to game mode selection...");
         } catch (IOException e) {
-            System.err.println("Error navigating to game view: " + e.getMessage());
+            System.err.println("Error navigating to game mode view: " + e.getMessage());
             e.printStackTrace();
-            showAlert(Alert.AlertType.ERROR, "Game Error", 
-                      "Could not start the game: " + e.getMessage());
+            showAlert(Alert.AlertType.ERROR, "Navigation Error", 
+                      "Could not open game mode selection: " + e.getMessage());
         }
     }
     
@@ -173,7 +181,7 @@ public class MainMenuController {
             Parent root = loader.load();
             
             Scene scene = new Scene(root);
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
@@ -219,7 +227,7 @@ public class MainMenuController {
             
             Scene scene = new Scene(root);
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }

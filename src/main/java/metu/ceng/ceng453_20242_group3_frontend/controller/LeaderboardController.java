@@ -218,7 +218,7 @@ public class LeaderboardController implements Initializable {
             
             Scene scene = new Scene(root);
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }

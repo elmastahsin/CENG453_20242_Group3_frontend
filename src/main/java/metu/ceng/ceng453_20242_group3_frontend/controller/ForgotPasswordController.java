@@ -20,6 +20,7 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import metu.ceng.ceng453_20242_group3_frontend.service.AuthService;
+import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
 
 /**
  * Controller for the forgot password view.
@@ -148,7 +149,7 @@ public class ForgotPasswordController {
             
             Scene scene = new Scene(root);
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
@@ -185,35 +186,20 @@ public class ForgotPasswordController {
     private void navigateToLogin() {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/login-view.fxml"));
-            Parent root = loader.load();
+            Scene scene = new Scene(loader.load(), AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT);
             
-            Scene scene = new Scene(root);
             // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
             
+            // Set up keyboard shortcuts for full screen
+            setupKeyboardShortcuts(scene);
+            
+            // Set the scene on the stage
             Stage stage = (Stage) forgotPasswordPane.getScene().getWindow();
-            
-            // Create fade-out transition
-            FadeTransition fadeOut = new FadeTransition(Duration.millis(300), forgotPasswordPane);
-            fadeOut.setFromValue(1.0);
-            fadeOut.setToValue(0.0);
-            fadeOut.setOnFinished(e -> {
-                // Add keyboard shortcuts for full screen mode
-                scene.setOnKeyPressed(ke -> {
-                    if (ke.getCode() == KeyCode.F11) {
-                        stage.setFullScreen(!stage.isFullScreen());
-                    } else if (ke.getCode() == KeyCode.ENTER && ke.isAltDown()) {
-                        stage.setFullScreen(!stage.isFullScreen());
-                    }
-                });
-                
-                stage.setScene(scene);
-            });
-            fadeOut.play();
-            
+            stage.setScene(scene);
         } catch (IOException e) {
             showAlert(Alert.AlertType.ERROR, "Navigation Error", 
                       "Could not navigate to login page: " + e.getMessage());
@@ -233,5 +219,21 @@ public class ForgotPasswordController {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+    
+    /**
+     * Sets up keyboard shortcuts for full screen mode on the given scene.
+     * 
+     * @param scene The scene to set up shortcuts for
+     */
+    private void setupKeyboardShortcuts(Scene scene) {
+        Stage stage = (Stage) forgotPasswordPane.getScene().getWindow();
+        scene.setOnKeyPressed(ke -> {
+            if (ke.getCode() == KeyCode.F11) {
+                stage.setFullScreen(!stage.isFullScreen());
+            } else if (ke.getCode() == KeyCode.ENTER && ke.isAltDown()) {
+                stage.setFullScreen(!stage.isFullScreen());
+            }
+        });
     }
 } 

@@ -16,6 +16,7 @@ import javafx.scene.input.KeyCombination;
 import javafx.stage.Stage;
 import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
 import metu.ceng.ceng453_20242_group3_frontend.controller.ResetPasswordController;
+import metu.ceng.ceng453_20242_group3_frontend.util.GameModeIconGenerator;
 import metu.ceng.ceng453_20242_group3_frontend.util.IconGenerator;
 import metu.ceng.ceng453_20242_group3_frontend.util.LogoGenerator;
 import metu.ceng.ceng453_20242_group3_frontend.util.ProtocolHandler;
@@ -36,8 +37,11 @@ public class UnoApplication extends Application {
         try {
             LogoGenerator.generateLogo();
             IconGenerator.generateIcon();
+            
+            // Generate game mode icons
+            GameModeIconGenerator.generateIcons();
         } catch (Exception e) {
-            System.err.println("Failed to generate logo or icon: " + e.getMessage());
+            System.err.println("Failed to generate logo or icons: " + e.getMessage());
         }
         
         // Register the protocol handler for handling password reset links
@@ -140,7 +144,7 @@ public class UnoApplication extends Application {
             Scene scene = new Scene(fxmlLoader.load(), AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT);
             
             // Apply CSS styling if available
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
@@ -177,7 +181,7 @@ public class UnoApplication extends Application {
             controller.setResetToken(token);
             
             // Apply CSS styling if available
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/styles.css");
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
