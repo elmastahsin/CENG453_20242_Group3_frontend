@@ -2,6 +2,8 @@ module metu.ceng.ceng453_20242_group3_frontend {
     requires javafx.controls;
     requires javafx.fxml;
     requires javafx.web;
+    requires java.desktop;
+    requires javafx.swing;
 
     requires org.controlsfx.controls;
     requires com.dlsc.formsfx;
