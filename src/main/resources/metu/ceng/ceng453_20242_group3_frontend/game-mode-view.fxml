@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<StackPane fx:id="gameModePane" alignment="CENTER" styleClass="game-mode-pane" 
+      xmlns="http://javafx.com/javafx" 
+      xmlns:fx="http://javafx.com/fxml" 
+      fx:controller="metu.ceng.ceng453_20242_group3_frontend.controller.GameModeController"
+      prefHeight="768.0" prefWidth="1024.0">
+    
+    <!-- Background elements -->
+    <VBox alignment="TOP_RIGHT" StackPane.alignment="TOP_RIGHT">
+        <ImageView fitHeight="200.0" fitWidth="200.0" pickOnBounds="true" preserveRatio="true">
+            <Image url="@../../../images/top-cards.png" />
+        </ImageView>
+    </VBox>
+    
+    <VBox alignment="BOTTOM_LEFT" StackPane.alignment="BOTTOM_LEFT">
+        <ImageView fitHeight="250.0" fitWidth="250.0" pickOnBounds="true" preserveRatio="true">
+            <Image url="@../../../images/bottom-cards.png" />
+        </ImageView>
+    </VBox>
+    
+    <!-- Main content -->
+    <VBox alignment="CENTER" spacing="40.0" maxWidth="800.0" styleClass="auth-card">
+        <ImageView fitHeight="150.0" fitWidth="300.0" preserveRatio="true" styleClass="app-logo">
+            <Image url="@../../../images/CengUnoLogo.png" />
+        </ImageView>
+        
+        <Label text="Select Number of Players" styleClass="title-label">
+            <font>
+                <Font name="System Bold" size="40.0" />
+            </font>
+        </Label>
+        
+        <HBox alignment="CENTER" spacing="30.0">
+            <!-- 2 Player Option -->
+            <VBox fx:id="twoPlayerBox" alignment="CENTER" spacing="20.0" styleClass="game-mode-option" 
+                  prefWidth="220.0" prefHeight="280.0">
+                <padding>
+                    <Insets top="20" right="20" bottom="20" left="20" />
+                </padding>
+                
+                <Label text="2" styleClass="player-count-label">
+                    <font>
+                        <Font name="System Bold" size="64.0" />
+                    </font>
+                </Label>
+                
+                <Label text="2 Players" styleClass="mode-title">
+                    <font>
+                        <Font name="System Bold" size="18.0" />
+                    </font>
+                </Label>
+                
+                <Label text="You vs Computer" styleClass="mode-description" wrapText="true" textAlignment="CENTER">
+                    <font>
+                        <Font size="14.0" />
+                    </font>
+                </Label>
+                
+                <Button fx:id="twoPlayerButton" text="Start Game" styleClass="mode-button" />
+            </VBox>
+            
+            <!-- 3 Player Option -->
+            <VBox fx:id="threePlayerBox" alignment="CENTER" spacing="20.0" styleClass="game-mode-option" 
+                  prefWidth="220.0" prefHeight="280.0">
+                <padding>
+                    <Insets top="20" right="20" bottom="20" left="20" />
+                </padding>
+                
+                <Label text="3" styleClass="player-count-label">
+                    <font>
+                        <Font name="System Bold" size="64.0" />
+                    </font>
+                </Label>
+                
+                <Label text="3 Players" styleClass="mode-title">
+                    <font>
+                        <Font name="System Bold" size="18.0" />
+                    </font>
+                </Label>
+                
+                <Label text="You vs 2 Computers" styleClass="mode-description" wrapText="true" textAlignment="CENTER">
+                    <font>
+                        <Font size="14.0" />
+                    </font>
+                </Label>
+                
+                <Button fx:id="threePlayerButton" text="Start Game" styleClass="mode-button" />
+            </VBox>
+            
+            <!-- 4 Player Option -->
+            <VBox fx:id="fourPlayerBox" alignment="CENTER" spacing="20.0" styleClass="game-mode-option" 
+                  prefWidth="220.0" prefHeight="280.0">
+                <padding>
+                    <Insets top="20" right="20" bottom="20" left="20" />
+                </padding>
+                
+                <Label text="4" styleClass="player-count-label">
+                    <font>
+                        <Font name="System Bold" size="64.0" />
+                    </font>
+                </Label>
+                
+                <Label text="4 Players" styleClass="mode-title">
+                    <font>
+                        <Font name="System Bold" size="18.0" />
+                    </font>
+                </Label>
+                
+                <Label text="You vs 3 Computers" styleClass="mode-description" wrapText="true" textAlignment="CENTER">
+                    <font>
+                        <Font size="14.0" />
+                    </font>
+                </Label>
+                
+                <Button fx:id="fourPlayerButton" text="Start Game" styleClass="mode-button" />
+            </VBox>
+        </HBox>
+        
+        <Button fx:id="backButton" text="Back to Main Menu" styleClass="back-button" prefWidth="200" />
+    </VBox>
+</StackPane> 
