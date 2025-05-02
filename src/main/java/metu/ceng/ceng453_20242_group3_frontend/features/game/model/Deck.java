@@ -1,35 +1,77 @@
 package metu.ceng.ceng453_20242_group3_frontend.features.game.model;
 
-import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
+
+import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
 
 /**
  * Represents a deck of UNO cards.
  */
 public class Deck {
     private final List<Card> cards;
+    private final Random random;
 
     /**
      * Constructor for creating an empty deck.
      */
     public Deck() {
         this.cards = new ArrayList<>();
+        this.random = new Random();
     }
 
     /**
-     * Constructor for creating a deck with initial cards.
+     * Constructor for creating a deck with a list of cards.
      *
-     * @param cards The initial list of cards
+     * @param cards The list of cards to add to the deck
      */
     public Deck(List<Card> cards) {
         this.cards = new ArrayList<>(cards);
+        this.random = new Random();
     }
 
     /**
-     * Gets all cards in the deck.
+     * Creates a standard UNO deck with all cards.
+     *
+     * @return A new deck with standard UNO cards
+     */
+    public static Deck createStandardDeck() {
+        Deck deck = new Deck();
+        
+        // Create standard colored cards (RED, BLUE, GREEN, YELLOW)
+        for (CardColor color : new CardColor[]{CardColor.RED, CardColor.BLUE, CardColor.GREEN, CardColor.YELLOW}) {
+            // Add one 0 card
+            deck.addCard(new Card(color, 0));
+            
+            // Add two of each number card 1-9
+            for (int i = 1; i <= 9; i++) {
+                deck.addCard(new Card(color, i));
+                deck.addCard(new Card(color, i));
+            }
+            
+            // Add two of each action card: Skip, Reverse, Draw Two
+            for (CardAction action : new CardAction[]{CardAction.SKIP, CardAction.REVERSE, CardAction.DRAW_TWO}) {
+                deck.addCard(new Card(color, action));
+                deck.addCard(new Card(color, action));
+            }
+        }
+        
+        // Add wild cards (4 of each)
+        for (int i = 0; i < AppConfig.CARD_WILD_COUNT; i++) {
+            deck.addCard(new Card(CardColor.MULTI, CardAction.WILD));
+            deck.addCard(new Card(CardColor.MULTI, CardAction.WILD_DRAW_FOUR));
+        }
+        
+        // Shuffle the deck
+        deck.shuffle();
+        
+        return deck;
+    }
+
+    /**
+     * Gets the list of cards in the deck.
      *
      * @return The list of cards
      */
@@ -40,7 +82,7 @@ public class Deck {
     /**
      * Gets the number of cards in the deck.
      *
-     * @return The number of cards
+     * @return The size of the deck
      */
     public int getSize() {
         return cards.size();
@@ -56,7 +98,7 @@ public class Deck {
     }
 
     /**
-     * Adds a card to the top of the deck.
+     * Adds a card to the deck.
      *
      * @param card The card to add
      */
@@ -65,12 +107,22 @@ public class Deck {
     }
 
     /**
-     * Adds cards to the top of the deck.
+     * Adds multiple cards to the deck.
      *
-     * @param newCards The cards to add
+     * @param cardsToAdd The list of cards to add
      */
-    public void addCards(List<Card> newCards) {
-        cards.addAll(newCards);
+    public void addCards(List<Card> cardsToAdd) {
+        cards.addAll(cardsToAdd);
+    }
+
+    /**
+     * Removes a card from the deck.
+     *
+     * @param card The card to remove
+     * @return true if the card was removed, false otherwise
+     */
+    public boolean removeCard(Card card) {
+        return cards.remove(card);
     }
 
     /**
@@ -82,11 +134,11 @@ public class Deck {
         if (isEmpty()) {
             return null;
         }
-        return cards.remove(cards.size() - 1);
+        return cards.remove(0);
     }
 
     /**
-     * Gets the top card without removing it.
+     * Peeks at the top card of the deck without removing it.
      *
      * @return The top card, or null if the deck is empty
      */
@@ -94,69 +146,23 @@ public class Deck {
         if (isEmpty()) {
             return null;
         }
-        return cards.get(cards.size() - 1);
+        return cards.get(0);
     }
 
     /**
      * Shuffles the deck.
      */
     public void shuffle() {
-        Collections.shuffle(cards);
-    }
-
-    /**
-     * Creates and returns a standard UNO deck.
-     * A deck of 120 cards consists of:
-     * - Two sets of numbered cards (0-9)
-     * - Skip, Reverse, and Draw Two cards in four colors (red, yellow, green, blue)
-     * - 8 Wild cards
-     * - 8 Wild Draw Four cards
-     *
-     * @return A new standard UNO deck
-     */
-    public static Deck createStandardDeck() {
-        List<Card> cards = new ArrayList<>();
-        CardColor[] colors = new CardColor[]{CardColor.RED, CardColor.BLUE, CardColor.GREEN, CardColor.YELLOW};
-
-        // For each color, add:
-        for (CardColor color : colors) {
-            // Two of each '0' card (making 8 zero cards total across 4 colors)
-            cards.add(new Card(color, CardType.NUMBER, 0));
-            cards.add(new Card(color, CardType.NUMBER, 0));
-
-            // Two of each number card 1-9 (making 72 number cards)
-            for (int i = 1; i <= 9; i++) {
-                cards.add(new Card(color, CardType.NUMBER, i));
-                cards.add(new Card(color, CardType.NUMBER, i));
-            }
-
-            // Two of each action card: Skip, Reverse, Draw Two (making 24 action cards)
-            for (int i = 0; i < 2; i++) {
-                cards.add(new Card(color, CardType.SKIP));
-                cards.add(new Card(color, CardType.REVERSE));
-                cards.add(new Card(color, CardType.DRAW_TWO));
-            }
-        }
-
-        // 8 Wild cards and 8 Wild Draw Four cards (making 16 wild cards)
-        for (int i = 0; i < 8; i++) {
-            cards.add(new Card(CardColor.WILD, CardType.WILD));
-            cards.add(new Card(CardColor.WILD, CardType.WILD_DRAW_FOUR));
-        }
-
-        // Verify we have 120 cards as per the requirement
-        if (cards.size() != AppConfig.UNO_DECK_SIZE) {
-            System.err.println("Warning: Deck created with " + cards.size() + 
-                " cards instead of the expected " + AppConfig.UNO_DECK_SIZE);
-        }
-
-        Deck deck = new Deck(cards);
-        deck.shuffle();
-        return deck;
+        Collections.shuffle(cards, random);
     }
 
     @Override
     public String toString() {
-        return "Deck with " + cards.size() + " cards";
+        StringBuilder sb = new StringBuilder();
+        sb.append("Deck: ").append(getSize()).append(" cards\n");
+        for (Card card : cards) {
+            sb.append(" - ").append(card.toString()).append("\n");
+        }
+        return sb.toString();
     }
 } 

@@ -22,10 +22,20 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
-import javafx.util.Pair;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.model.ComputerAIPlayer;
-import metu.ceng.ceng453_20242_group3_frontend.features.common.util.SessionManager;
 import javafx.util.Duration;
+
+import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Card;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.model.CardAction;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.model.CardColor;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.model.CardType;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.model.ComputerAIPlayer;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Game;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.model.GameMode;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Player;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.model.PlayerCount;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Direction;
+import metu.ceng.ceng453_20242_group3_frontend.features.common.util.SessionManager;
 
 /**
  * Controller for the game view.
@@ -90,18 +100,26 @@ public class GameController {
     @FXML
     private Label currentTurnLabel;
     
-    // Game state
-    private boolean isClockwise = true;
-    private int playerCount = 2; // Default to 2 players
-    private List<ComputerAIPlayer> aiPlayers = new ArrayList<>();
-    private int currentPlayerIndex = 0; // 0 = local player, 1+ = AI opponents
+    // Game state using our Game model
+    private Game game;
     private boolean isGameRunning = true;
+    private boolean firstCardPlayed = false;
     
-    // Card colors
+    // Legacy fields to be removed after full refactoring
+    private List<ComputerAIPlayer> aiPlayers = new ArrayList<>();
+    
+    // Card colors for legacy code - will be removed in future refactoring
     private final Color RED_COLOR = Color.rgb(227, 35, 45);
     private final Color GREEN_COLOR = Color.rgb(67, 176, 71);
     private final Color BLUE_COLOR = Color.rgb(0, 122, 193);
     private final Color YELLOW_COLOR = Color.rgb(243, 206, 37);
+    
+    // Action card icons
+    private final String SKIP_ICON = "⊘";
+    private final String REVERSE_ICON = "↺";
+    private final String DRAW_TWO_ICON = "+2";
+    private final String WILD_ICON = "★";
+    private final String WILD_DRAW_FOUR_ICON = "+4";
     
     @FXML
     private void initialize() {
@@ -114,12 +132,6 @@ public class GameController {
         // Set up exit game button
         exitGameButton.setOnAction(event -> exitGame());
         
-        // Update direction indicator
-        updateDirectionIndicator();
-        
-        // Initialize turn label
-        updateTurnLabel();
-        
         // Set up game table animations
         setupGameTableAnimations();
     }
@@ -127,374 +139,822 @@ public class GameController {
     /**
      * Initializes the game with the specified parameters.
      * 
-     * @param gameMode The game mode
+     * @param gameMode The game mode (singleplayer/multiplayer)
      * @param aiPlayerCount Number of AI players
      * @param initialCardCount Number of initial cards for each player
      */
     public void initializeGame(String gameMode, int aiPlayerCount, int initialCardCount) {
-        // Set player count (user + AI players)
-        this.playerCount = aiPlayerCount + 1;
+        // Create PlayerCount enum
+        PlayerCount playerCount;
+        switch (aiPlayerCount + 1) { // +1 for human player
+            case 2:
+                playerCount = PlayerCount.TWO;
+                break;
+            case 3:
+                playerCount = PlayerCount.THREE;
+                break;
+            case 4:
+                playerCount = PlayerCount.FOUR;
+                break;
+            default:
+                playerCount = PlayerCount.TWO; // Default
+        }
         
-        // Initialize AI players
+        // Create a new game instance
+        this.game = new Game(
+            "multiplayer".equalsIgnoreCase(gameMode) ? GameMode.MULTIPLAYER : GameMode.SINGLEPLAYER,
+            playerCount
+        );
+        
+        // Reset first card flag
+        firstCardPlayed = false;
+        
+        // Clear any existing players
         this.aiPlayers.clear();
+        
+        // Add human player (current user)
+        String username = SessionManager.getInstance().isLoggedIn() ? 
+                          SessionManager.getInstance().getCurrentUser().getUsername() : 
+                          "Player";
+        Player humanPlayer = new Player(username);
+        game.addPlayer(humanPlayer);
+        
+        // Add AI players
         for (int i = 0; i < aiPlayerCount; i++) {
-            String opponentName = "Opponent " + (i+1);
+            String aiName = "Opponent " + (i+1);
+            Player aiPlayer = new Player(aiName, true);
+            game.addPlayer(aiPlayer);
             
-            aiPlayers.add(new ComputerAIPlayer(opponentName));
+            // Legacy AI players (to be removed in future)
+            aiPlayers.add(new ComputerAIPlayer(aiName));
         }
         
         // Configure player areas based on player count
-        setupPlayerAreas(this.playerCount);
+        setupPlayerAreas(game.getPlayerCount().getCount());
         
-        // Generate cards
-        generatePlayerCards(initialCardCount);
-        generateOpponentCards(aiPlayerCount, initialCardCount);
+        // Start the game (this deals cards and initializes the discard pile)
+        game.startGame();
         
-        // Start with local player's turn
-        this.currentPlayerIndex = 0;
+        // Update the UI
+        updateUI();
         
         // Update direction indicator
         updateDirectionIndicator();
+        
+        // Update turn label
+        updateTurnLabel();
     }
     
     /**
-     * Sets up the player areas based on total player count.
-     * 
-     * @param playerCount The total number of players (2-4)
+     * Updates the UI to match the current game state
      */
-    private void setupPlayerAreas(int playerCount) {
-        // Configure visibility based on player count
-        switch (playerCount) {
-            case 2: // 2 players: bottom and top
-                topPlayerArea.setVisible(true);
-                leftPlayerArea.setVisible(false);
-                rightPlayerArea.setVisible(false);
-                
-                if (!aiPlayers.isEmpty()) {
-                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
-                } else {
-                    topPlayerNameLabel.setText("Opponent 1");
-                }
-                break;
-                
-            case 3: // 3 players: bottom, top, and left
-                topPlayerArea.setVisible(true);
-                leftPlayerArea.setVisible(true);
-                rightPlayerArea.setVisible(false);
-                
-                if (aiPlayers.size() >= 2) {
-                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
-                    leftPlayerNameLabel.setText(aiPlayers.get(1).getName());
-                } else {
-                    topPlayerNameLabel.setText("Opponent 1");
-                    leftPlayerNameLabel.setText("Opponent 2");
-                }
-                break;
-                
-            case 4: // 4 players: all positions
-                topPlayerArea.setVisible(true);
-                leftPlayerArea.setVisible(true);
-                rightPlayerArea.setVisible(true);
-                
-                if (aiPlayers.size() >= 3) {
-                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
-                    leftPlayerNameLabel.setText(aiPlayers.get(1).getName());
-                    rightPlayerNameLabel.setText(aiPlayers.get(2).getName());
-                } else {
-                    topPlayerNameLabel.setText("Opponent 1");
-                    leftPlayerNameLabel.setText("Opponent 2");
-                    rightPlayerNameLabel.setText("Opponent 3");
-                }
-                break;
-                
-            default: // Default to 2 players if invalid count
-                topPlayerArea.setVisible(true);
-                leftPlayerArea.setVisible(false);
-                rightPlayerArea.setVisible(false);
-                
-                topPlayerNameLabel.setText("Opponent 1");
-                break;
-        }
-        
-        // For grid layout - must keep areas managed but transparent
-        leftPlayerArea.setManaged(true);
-        rightPlayerArea.setManaged(true);
-        
-        // Make invisible areas transparent instead of completely hiding them
-        if (!leftPlayerArea.isVisible()) {
-            leftPlayerArea.setOpacity(0);
-            leftPlayerNameLabel.setOpacity(0);
-        } else {
-            leftPlayerArea.setOpacity(1);
-            leftPlayerNameLabel.setOpacity(1);
-        }
-        
-        if (!rightPlayerArea.isVisible()) {
-            rightPlayerArea.setOpacity(0);
-            rightPlayerNameLabel.setOpacity(0);
-        } else {
-            rightPlayerArea.setOpacity(1);
-            rightPlayerNameLabel.setOpacity(1);
-        }
-        
-        // Ensure all labels are clearly visible
-        topPlayerNameLabel.toFront();
-        leftPlayerNameLabel.toFront();
-        rightPlayerNameLabel.toFront();
-        bottomPlayerNameLabel.toFront();
-    }
-    
-    /**
-     * Generates cards for the local player.
-     * 
-     * @param cardCount Number of cards to generate
-     */
-    private void generatePlayerCards(int cardCount) {
-        // Clear existing cards
+    private void updateUI() {
+        // Clear any existing cards
         bottomPlayerCardsContainer.getChildren().clear();
-        
-        // Sample player cards - removed Wild card as requested
-        List<Pair<String, Color>> playerCards = Arrays.asList(
-            new Pair<>("7", BLUE_COLOR),
-            new Pair<>("2", GREEN_COLOR),
-            new Pair<>("4", GREEN_COLOR),
-            new Pair<>("0", RED_COLOR),
-            new Pair<>("2", RED_COLOR),
-            new Pair<>("2", BLUE_COLOR),
-            new Pair<>("5", YELLOW_COLOR)
-        );
-        
-        // Add cards to player's hand
-        for (int i = 0; i < Math.min(cardCount, playerCards.size()); i++) {
-            Pair<String, Color> cardInfo = playerCards.get(i);
-            StackPane card = createCard(cardInfo.getKey(), cardInfo.getValue());
-            card.setOnMouseClicked(event -> playCard(card));
-            bottomPlayerCardsContainer.getChildren().add(card);
-        }
-    }
-    
-    /**
-     * Generates cards for all opponents.
-     * 
-     * @param opponentCount Number of opponents
-     * @param cardCount Number of cards per opponent
-     */
-    private void generateOpponentCards(int opponentCount, int cardCount) {
-        // Clear existing cards
         topPlayerCardsContainer.getChildren().clear();
         leftPlayerCardsContainer.getChildren().clear();
         rightPlayerCardsContainer.getChildren().clear();
         
-        // Always generate top opponent cards (1+ opponents)
-        for (int i = 0; i < cardCount; i++) {
-            Rectangle cardBack = createCardBack();
-            StackPane card = new StackPane(cardBack);
-            card.getStyleClass().add("uno-card");
-            card.setStyle("-fx-opacity: 1.0;"); // Make sure cards are fully visible
-            topPlayerCardsContainer.getChildren().add(card);
+        // Clear draw and discard piles
+        drawPileContainer.getChildren().clear();
+        discardPileContainer.getChildren().clear();
+        
+        // Display player cards
+        List<Player> players = game.getPlayers();
+        if (!players.isEmpty()) {
+            // Human player's cards (always the first player in our design)
+            Player humanPlayer = players.get(0);
+            for (Card card : humanPlayer.getHand()) {
+                StackPane cardView = createCardView(card);
+                cardView.setOnMouseClicked(event -> playCard(cardView, card));
+                bottomPlayerCardsContainer.getChildren().add(cardView);
+            }
+            
+            // Display AI cards (all other players)
+            if (players.size() > 1) {
+                // Top opponent (always exists if there are AI players)
+                displayOpponentCards(1, topPlayerCardsContainer, false, 0);
+                
+                // Left opponent (if there are at least 3 players total)
+                if (players.size() > 2) {
+                    displayOpponentCards(2, leftPlayerCardsContainer, true, 90);
+                }
+                
+                // Right opponent (if there are 4 players total)
+                if (players.size() > 3) {
+                    displayOpponentCards(3, rightPlayerCardsContainer, true, -90);
+                }
+            }
         }
         
-        // Generate left opponent cards (2+ opponents) with horizontal orientation
-        for (int i = 0; i < cardCount; i++) {
-            Rectangle cardBack = createCardBack();
-            // Use original size but rotate the card container
-            StackPane card = new StackPane(cardBack);
-            card.getStyleClass().add("uno-card");
-            card.setStyle("-fx-opacity: 1.0;"); // Make sure cards are fully visible
-            
-            // Apply rotation to make cards horizontal
-            card.setRotate(90);
-            
-            leftPlayerCardsContainer.getChildren().add(card);
-        }
+        // Set up draw pile
+        setupDrawPile();
         
-        // Generate right opponent cards (3 opponents) with horizontal orientation
-        for (int i = 0; i < cardCount; i++) {
-            Rectangle cardBack = createCardBack();
-            // Use original size but rotate the card container
-            StackPane card = new StackPane(cardBack);
-            card.getStyleClass().add("uno-card");
-            card.setStyle("-fx-opacity: 1.0;"); // Make sure cards are fully visible
-            
-            // Apply rotation to make cards horizontal
-            card.setRotate(-90);
-            
-            rightPlayerCardsContainer.getChildren().add(card);
+        // Set up discard pile if a card has been played
+        if (firstCardPlayed) {
+            setupDiscardPile();
         }
     }
     
     /**
-     * Creates a card with the specified value and color.
+     * Displays opponent cards as card backs
      * 
-     * @param value The value of the card
-     * @param color The color of the card
-     * @return A StackPane representing the card
+     * @param playerIndex The index of the player in the game's player list
+     * @param container The container to add the cards to
+     * @param vertical Whether to display cards vertically (for side opponents)
+     * @param rotation Rotation angle for the cards
      */
-    private StackPane createCard(String value, Color color) {
-        StackPane card = new StackPane();
-        card.setPrefSize(80, 120);
-        card.getStyleClass().add("uno-card");
+    private void displayOpponentCards(int playerIndex, javafx.scene.layout.Pane container, boolean vertical, double rotation) {
+        if (playerIndex < 0 || playerIndex >= game.getPlayers().size()) {
+            return;
+        }
+        
+        Player opponent = game.getPlayers().get(playerIndex);
+        
+        // Debug mode: Show cards face up instead of card backs
+        for (Card card : opponent.getHand()) {
+            StackPane cardView = createCardView(card);
+            
+            if (rotation != 0) {
+                cardView.setRotate(rotation);
+            }
+            
+            container.getChildren().add(cardView);
+        }
+    }
+    
+    /**
+     * Sets up the draw pile in the UI
+     */
+    private void setupDrawPile() {
+        // Clear existing content
+        drawPileContainer.getChildren().clear();
+        
+        // Create card back for draw pile
+        StackPane cardView = createCardBackView();
+        drawPileContainer.getChildren().add(cardView);
+        
+        // Add draw pile label
+        Label pileLabel = new Label("DRAW PILE");
+        pileLabel.getStyleClass().add("card-pile-label");
+        drawPileContainer.getChildren().add(pileLabel);
+        
+        // Add click handler for drawing cards
+        cardView.setOnMouseClicked(event -> {
+            // First click after game start should place initial card on discard pile
+            if (!firstCardPlayed) {
+                startFirstCardPlay();
+            } else {
+                drawCard();
+            }
+        });
+    }
+    
+    /**
+     * Places the first card in the discard pile to start the game
+     */
+    private void startFirstCardPlay() {
+        Card initialCard = game.startFirstTurn();
+        
+        if (initialCard != null) {
+            firstCardPlayed = true;
+            
+            // Update discard pile view
+            setupDiscardPile();
+            
+            // Update playable cards
+            updatePlayableCards();
+        }
+    }
+    
+    /**
+     * Updates which cards are playable based on the top discard card
+     */
+    private void updatePlayableCards() {
+        Card topCard = game.getDiscardPile().peekCard();
+        if (topCard == null) return;
+        
+        // Only update UI for human player (index 0)
+        if (game.getCurrentPlayerIndex() == 0) {
+            Player humanPlayer = game.getPlayers().get(0);
+            
+            // Reset all cards to non-playable
+            for (Card card : humanPlayer.getHand()) {
+                card.setPlayable(false);
+            }
+            
+            // Set cards that can be played as playable
+            for (Card card : humanPlayer.getHand()) {
+                card.setPlayable(card.canPlayOn(topCard));
+            }
+            
+            // Refresh the card visuals
+            updatePlayerHandVisuals();
+        }
+    }
+    
+    /**
+     * Updates the visual appearance of cards in the player's hand
+     */
+    private void updatePlayerHandVisuals() {
+        bottomPlayerCardsContainer.getChildren().clear();
+        
+        if (game.getPlayers().isEmpty()) return;
+        
+        Player humanPlayer = game.getPlayers().get(0);
+        for (Card card : humanPlayer.getHand()) {
+            StackPane cardView = createCardView(card);
+            cardView.setOnMouseClicked(event -> playCard(cardView, card));
+            
+            // Add glow effect to playable cards
+            if (card.isPlayable() && game.getCurrentPlayerIndex() == 0) {
+                cardView.setEffect(new javafx.scene.effect.DropShadow(10, Color.WHITE));
+                cardView.setStyle("-fx-cursor: hand;");
+            }
+            
+            bottomPlayerCardsContainer.getChildren().add(cardView);
+        }
+    }
+    
+    /**
+     * Sets up the discard pile in the UI
+     */
+    private void setupDiscardPile() {
+        // Clear existing content
+        discardPileContainer.getChildren().clear();
+        
+        // Get the top card from the discard pile
+        Card topCard = game.getDiscardPile().peekCard();
+        
+        if (topCard != null) {
+            // Create and add the top card view
+            StackPane cardView = createCardView(topCard);
+            discardPileContainer.getChildren().add(cardView);
+        } else {
+            // Create an empty discard pile placeholder when no cards are present
+            StackPane emptyPile = new StackPane();
+            emptyPile.setPrefSize(80, 120);
+            
+            Rectangle emptyRect = new Rectangle(80, 120);
+            emptyRect.setArcWidth(15);
+            emptyRect.setArcHeight(15);
+            emptyRect.setFill(Color.rgb(0, 50, 0, 0.5));
+            emptyRect.setStroke(Color.WHITE);
+            emptyRect.setStrokeWidth(2);
+            emptyRect.getStrokeDashArray().addAll(5.0, 5.0);
+            
+            Label emptyLabel = new Label("EMPTY");
+            emptyLabel.setTextFill(Color.WHITE);
+            
+            emptyPile.getChildren().addAll(emptyRect, emptyLabel);
+            discardPileContainer.getChildren().add(emptyPile);
+        }
+        
+        // Add discard pile label
+        Label pileLabel = new Label("DISCARD PILE");
+        pileLabel.getStyleClass().add("card-pile-label");
+        discardPileContainer.getChildren().add(pileLabel);
+    }
+    
+    /**
+     * Handles the action of drawing a card from the draw pile
+     */
+    private void drawCard() {
+        // Only allow drawing on the player's turn
+        if (game.getCurrentPlayerIndex() != 0) {
+            return;
+        }
+        
+        // Draw a card for the current player
+        Card drawnCard = game.drawCardForCurrentPlayer();
+        
+        if (drawnCard != null) {
+            // Add the card to the UI
+            StackPane cardView = createCardView(drawnCard);
+            cardView.setOnMouseClicked(event -> playCard(cardView, drawnCard));
+            
+            // Animate the card being drawn
+            cardView.setTranslateY(-50);
+            cardView.setOpacity(0);
+            
+            bottomPlayerCardsContainer.getChildren().add(cardView);
+            
+            javafx.animation.ParallelTransition pt = new javafx.animation.ParallelTransition(
+                new javafx.animation.TranslateTransition(Duration.millis(300), cardView),
+                new javafx.animation.FadeTransition(Duration.millis(300), cardView)
+            );
+            
+            ((javafx.animation.TranslateTransition)pt.getChildren().get(0)).setToY(0);
+            ((javafx.animation.FadeTransition)pt.getChildren().get(1)).setToValue(1);
+            
+            pt.play();
+            
+            // Update turn label
+            updateTurnLabel();
+        }
+    }
+    
+    /**
+     * Creates a visual representation of a card.
+     *
+     * @param card The card model to display
+     * @return A StackPane containing the card visualization
+     */
+    private StackPane createCardView(Card card) {
+        // Always create cards programmatically for consistency
+        if (card.isNumberCard()) {
+            return createNumberCardView(card);
+        } else if (card.isWildCard()) {
+            if (card.getAction() == CardAction.WILD) {
+                return createWildCardView(card);
+            } else {
+                return createWildDrawFourCardView(card);
+            }
+        } else {
+            // Action cards: Skip, Reverse, Draw Two
+            return createActionCardView(card);
+        }
+    }
+    
+    /**
+     * Creates a visual representation of a number card.
+     *
+     * @param card The card model to display
+     * @return A StackPane containing the card visualization
+     */
+    private StackPane createNumberCardView(Card card) {
+        StackPane cardView = new StackPane();
+        cardView.setPrefSize(80, 120);
+        cardView.getStyleClass().add("uno-card");
         
         Rectangle cardBase = new Rectangle(80, 120);
         cardBase.setArcWidth(15);
         cardBase.setArcHeight(15);
         
-        if (color != null) {
-            // Regular number card or special card with color
-            cardBase.setFill(color);
-            cardBase.setStroke(Color.WHITE);
-            cardBase.setStrokeWidth(2);
-            
-            card.getChildren().add(cardBase);
-            
-            // Add white oval in the middle (UNO card style)
-            javafx.scene.shape.Ellipse whiteEllipse = new javafx.scene.shape.Ellipse(30, 45);
-            whiteEllipse.setFill(Color.WHITE);
-            whiteEllipse.setRotate(30);
-            
-            card.getChildren().add(whiteEllipse);
-            
-            // Add card value
-            Label valueLabel = new Label(value);
-            valueLabel.setStyle("-fx-font-size: 36px; -fx-font-weight: bold;");
-            valueLabel.setTextFill(color);
-            card.getChildren().add(valueLabel);
-            
-            // Add smaller value in top-left corner
-            Label cornerLabel = new Label(value);
-            cornerLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-            cornerLabel.setTextFill(Color.WHITE);
-            cornerLabel.setTranslateX(-25);
-            cornerLabel.setTranslateY(-45);
-            card.getChildren().add(cornerLabel);
-            
-        } else {
-            // Wild card - create multicolored design
-            Rectangle wildCardBase = new Rectangle(80, 120);
-            wildCardBase.setArcWidth(15);
-            wildCardBase.setArcHeight(15);
-            wildCardBase.setFill(Color.BLACK);
-            
-            card.getChildren().add(wildCardBase);
-            
-            // Create the wild card circle with segments
-            double centerX = 40;
-            double centerY = 60;
-            double radius = 30;
-            
-            // Red segment (top-left)
-            javafx.scene.shape.Arc redSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 135, 90);
-            redSegment.setType(javafx.scene.shape.ArcType.ROUND);
-            redSegment.setFill(RED_COLOR);
-            
-            // Blue segment (top-right)
-            javafx.scene.shape.Arc blueSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 45, 90);
-            blueSegment.setType(javafx.scene.shape.ArcType.ROUND);
-            blueSegment.setFill(BLUE_COLOR);
-            
-            // Yellow segment (bottom-right)
-            javafx.scene.shape.Arc yellowSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, -45, 90);
-            yellowSegment.setType(javafx.scene.shape.ArcType.ROUND);
-            yellowSegment.setFill(YELLOW_COLOR);
-            
-            // Green segment (bottom-left)
-            javafx.scene.shape.Arc greenSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 225, 90);
-            greenSegment.setType(javafx.scene.shape.ArcType.ROUND);
-            greenSegment.setFill(GREEN_COLOR);
-            
-            card.getChildren().addAll(redSegment, blueSegment, yellowSegment, greenSegment);
-            
-            // Add "Wild" text
-            Label wildLabel = new Label("Wild");
-            wildLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
-            wildLabel.setTextFill(Color.WHITE);
-            wildLabel.setTranslateY(40);
-            card.getChildren().add(wildLabel);
+        // Determine color based on card color
+        Color cardColor = getColorFromCardColor(card.getColor());
+        
+        cardBase.setFill(cardColor);
+        cardBase.setStroke(Color.WHITE);
+        cardBase.setStrokeWidth(2);
+        
+        cardView.getChildren().add(cardBase);
+        
+        // Add white oval in the middle (UNO card style)
+        javafx.scene.shape.Ellipse whiteEllipse = new javafx.scene.shape.Ellipse(30, 45);
+        whiteEllipse.setFill(Color.WHITE);
+        whiteEllipse.setRotate(30);
+        
+        cardView.getChildren().add(whiteEllipse);
+        
+        // Add card value in center
+        String value = String.valueOf(card.getValue());
+        Label valueLabel = new Label(value);
+        valueLabel.setStyle("-fx-font-size: 36px; -fx-font-weight: bold;");
+        valueLabel.setTextFill(cardColor);
+        cardView.getChildren().add(valueLabel);
+        
+        // Add smaller value in top-left corner
+        Label topLeftLabel = new Label(value);
+        topLeftLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        topLeftLabel.setTextFill(Color.WHITE);
+        topLeftLabel.setTranslateX(-25);
+        topLeftLabel.setTranslateY(-45);
+        cardView.getChildren().add(topLeftLabel);
+        
+        // Add reflected value in bottom-right corner
+        Label bottomRightLabel = new Label(value);
+        bottomRightLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        bottomRightLabel.setTextFill(Color.WHITE);
+        bottomRightLabel.setTranslateX(25);
+        bottomRightLabel.setTranslateY(45);
+        bottomRightLabel.setRotate(180); // Rotate to create reflection effect
+        cardView.getChildren().add(bottomRightLabel);
+        
+        // Set appropriate style for playable cards
+        if (card.isPlayable()) {
+            cardView.setEffect(new javafx.scene.effect.DropShadow(15, Color.WHITE));
+            cardView.setStyle("-fx-cursor: hand;");
         }
         
-        return card;
+        return cardView;
+    }
+    
+    /**
+     * Creates a visual representation of an action card.
+     *
+     * @param card The card model to display
+     * @return A StackPane containing the card visualization
+     */
+    private StackPane createActionCardView(Card card) {
+        StackPane cardView = new StackPane();
+        cardView.setPrefSize(80, 120);
+        cardView.getStyleClass().add("uno-card");
+        
+        Rectangle cardBase = new Rectangle(80, 120);
+        cardBase.setArcWidth(15);
+        cardBase.setArcHeight(15);
+        
+        // Determine color based on card color
+        Color cardColor = getColorFromCardColor(card.getColor());
+        
+        cardBase.setFill(cardColor);
+        cardBase.setStroke(Color.WHITE);
+        cardBase.setStrokeWidth(2);
+        
+        cardView.getChildren().add(cardBase);
+        
+        // Add white oval in the middle (UNO card style)
+        javafx.scene.shape.Ellipse whiteEllipse = new javafx.scene.shape.Ellipse(30, 45);
+        whiteEllipse.setFill(Color.WHITE);
+        whiteEllipse.setRotate(30);
+        
+        cardView.getChildren().add(whiteEllipse);
+        
+        // Add card action name and icon
+        String actionText = "";
+        String actionIcon = card.getAction().getSymbol();
+        
+        switch (card.getAction()) {
+            case SKIP:
+                actionText = "SKIP";
+                break;
+            case REVERSE:
+                actionText = "REV";
+                break;
+            case DRAW_TWO:
+                actionText = "DRAW";
+                break;
+            default:
+                actionText = card.getAction().name();
+                break;
+        }
+        
+        // Add icon
+        Label iconLabel = new Label(actionIcon);
+        iconLabel.setStyle("-fx-font-size: 38px; -fx-font-weight: bold;");
+        iconLabel.setTextFill(cardColor);
+        cardView.getChildren().add(iconLabel);
+        
+        // Add text below icon
+        Label textLabel = new Label(actionText);
+        textLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+        textLabel.setTextFill(cardColor);
+        textLabel.setTranslateY(30);
+        cardView.getChildren().add(textLabel);
+        
+        // Add smaller icon in top-left corner
+        Label topLeftLabel = new Label(actionIcon);
+        topLeftLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        topLeftLabel.setTextFill(Color.WHITE);
+        topLeftLabel.setTranslateX(-25);
+        topLeftLabel.setTranslateY(-45);
+        cardView.getChildren().add(topLeftLabel);
+        
+        // Add reflected icon in bottom-right corner
+        Label bottomRightLabel = new Label(actionIcon);
+        bottomRightLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        bottomRightLabel.setTextFill(Color.WHITE);
+        bottomRightLabel.setTranslateX(25);
+        bottomRightLabel.setTranslateY(45);
+        bottomRightLabel.setRotate(180);
+        cardView.getChildren().add(bottomRightLabel);
+        
+        // Set appropriate style for playable cards
+        if (card.isPlayable()) {
+            cardView.setEffect(new javafx.scene.effect.DropShadow(15, Color.WHITE));
+            cardView.setStyle("-fx-cursor: hand;");
+        }
+        
+        return cardView;
+    }
+    
+    /**
+     * Creates a visual representation of a wild card.
+     *
+     * @param card The card model to display
+     * @return A StackPane containing the card visualization
+     */
+    private StackPane createWildCardView(Card card) {
+        StackPane cardView = new StackPane();
+        cardView.setPrefSize(80, 120);
+        cardView.getStyleClass().add("uno-card");
+        
+        // Wild card - create multicolored design
+        Rectangle wildCardBase = new Rectangle(80, 120);
+        wildCardBase.setArcWidth(15);
+        wildCardBase.setArcHeight(15);
+        wildCardBase.setFill(Color.BLACK);
+        
+        cardView.getChildren().add(wildCardBase);
+        
+        // Create the wild card circle with segments
+        double centerX = 40;
+        double centerY = 60;
+        double radius = 30;
+        
+        // Red segment (top-left)
+        javafx.scene.shape.Arc redSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 135, 90);
+        redSegment.setType(javafx.scene.shape.ArcType.ROUND);
+        redSegment.setFill(RED_COLOR);
+        
+        // Blue segment (top-right)
+        javafx.scene.shape.Arc blueSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 45, 90);
+        blueSegment.setType(javafx.scene.shape.ArcType.ROUND);
+        blueSegment.setFill(BLUE_COLOR);
+        
+        // Yellow segment (bottom-right)
+        javafx.scene.shape.Arc yellowSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, -45, 90);
+        yellowSegment.setType(javafx.scene.shape.ArcType.ROUND);
+        yellowSegment.setFill(YELLOW_COLOR);
+        
+        // Green segment (bottom-left)
+        javafx.scene.shape.Arc greenSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 225, 90);
+        greenSegment.setType(javafx.scene.shape.ArcType.ROUND);
+        greenSegment.setFill(GREEN_COLOR);
+        
+        cardView.getChildren().addAll(redSegment, blueSegment, yellowSegment, greenSegment);
+        
+        // Add wild star icon
+        Label iconLabel = new Label("★");
+        iconLabel.setStyle("-fx-font-size: 36px; -fx-font-weight: bold;");
+        iconLabel.setTextFill(Color.WHITE);
+        iconLabel.setTranslateY(-15);
+        cardView.getChildren().add(iconLabel);
+        
+        // Add "WILD" text
+        Label wildLabel = new Label("WILD");
+        wildLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        wildLabel.setTextFill(Color.WHITE);
+        wildLabel.setTranslateY(20);
+        cardView.getChildren().add(wildLabel);
+        
+        // Add "W" in top-left corner
+        Label topLeftLabel = new Label("W");
+        topLeftLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        topLeftLabel.setTextFill(Color.WHITE);
+        topLeftLabel.setTranslateX(-25);
+        topLeftLabel.setTranslateY(-45);
+        cardView.getChildren().add(topLeftLabel);
+        
+        // Add reflected "W" in bottom-right corner
+        Label bottomRightLabel = new Label("W");
+        bottomRightLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        bottomRightLabel.setTextFill(Color.WHITE);
+        bottomRightLabel.setTranslateX(25);
+        bottomRightLabel.setTranslateY(45);
+        bottomRightLabel.setRotate(180);
+        cardView.getChildren().add(bottomRightLabel);
+        
+        // Set appropriate style for playable cards
+        if (card.isPlayable()) {
+            cardView.setEffect(new javafx.scene.effect.DropShadow(15, Color.WHITE));
+            cardView.setStyle("-fx-cursor: hand;");
+        }
+        
+        return cardView;
+    }
+    
+    /**
+     * Creates a visual representation of a Wild Draw Four card.
+     *
+     * @param card The card model to display
+     * @return A StackPane containing the card visualization
+     */
+    private StackPane createWildDrawFourCardView(Card card) {
+        StackPane cardView = new StackPane();
+        cardView.setPrefSize(80, 120);
+        cardView.getStyleClass().add("uno-card");
+        
+        // Wild card - create multicolored design
+        Rectangle wildCardBase = new Rectangle(80, 120);
+        wildCardBase.setArcWidth(15);
+        wildCardBase.setArcHeight(15);
+        wildCardBase.setFill(Color.BLACK);
+        
+        cardView.getChildren().add(wildCardBase);
+        
+        // Create the wild card circle with segments
+        double centerX = 40;
+        double centerY = 60;
+        double radius = 30;
+        
+        // Red segment (top-left)
+        javafx.scene.shape.Arc redSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 135, 90);
+        redSegment.setType(javafx.scene.shape.ArcType.ROUND);
+        redSegment.setFill(RED_COLOR);
+        
+        // Blue segment (top-right)
+        javafx.scene.shape.Arc blueSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 45, 90);
+        blueSegment.setType(javafx.scene.shape.ArcType.ROUND);
+        blueSegment.setFill(BLUE_COLOR);
+        
+        // Yellow segment (bottom-right)
+        javafx.scene.shape.Arc yellowSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, -45, 90);
+        yellowSegment.setType(javafx.scene.shape.ArcType.ROUND);
+        yellowSegment.setFill(YELLOW_COLOR);
+        
+        // Green segment (bottom-left)
+        javafx.scene.shape.Arc greenSegment = new javafx.scene.shape.Arc(centerX, centerY, radius, radius, 225, 90);
+        greenSegment.setType(javafx.scene.shape.ArcType.ROUND);
+        greenSegment.setFill(GREEN_COLOR);
+        
+        cardView.getChildren().addAll(redSegment, blueSegment, yellowSegment, greenSegment);
+        
+        // Add "+4" icon
+        Label iconLabel = new Label("+4");
+        iconLabel.setStyle("-fx-font-size: 36px; -fx-font-weight: bold;");
+        iconLabel.setTextFill(Color.WHITE);
+        iconLabel.setTranslateY(-15);
+        cardView.getChildren().add(iconLabel);
+        
+        // Add "WILD +4" text
+        Label wildLabel = new Label("WILD +4");
+        wildLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        wildLabel.setTextFill(Color.WHITE);
+        wildLabel.setTranslateY(20);
+        cardView.getChildren().add(wildLabel);
+        
+        // Add "+4" in top-left corner
+        Label topLeftLabel = new Label("+4");
+        topLeftLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        topLeftLabel.setTextFill(Color.WHITE);
+        topLeftLabel.setTranslateX(-25);
+        topLeftLabel.setTranslateY(-45);
+        cardView.getChildren().add(topLeftLabel);
+        
+        // Add reflected "+4" in bottom-right corner
+        Label bottomRightLabel = new Label("+4");
+        bottomRightLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        bottomRightLabel.setTextFill(Color.WHITE);
+        bottomRightLabel.setTranslateX(25);
+        bottomRightLabel.setTranslateY(45);
+        bottomRightLabel.setRotate(180);
+        cardView.getChildren().add(bottomRightLabel);
+        
+        // Set appropriate style for playable cards
+        if (card.isPlayable()) {
+            cardView.setEffect(new javafx.scene.effect.DropShadow(15, Color.WHITE));
+            cardView.setStyle("-fx-cursor: hand;");
+        }
+        
+        return cardView;
     }
     
     /**
      * Creates a card back for opponent cards.
-     * 
-     * @return A Rectangle representing the card back
+     *
+     * @return A StackPane representing the card back
      */
-    private Rectangle createCardBack() {
+    private StackPane createCardBackView() {
+        StackPane cardView = new StackPane();
+        cardView.setPrefSize(80, 120);
+        cardView.getStyleClass().add("uno-card");
+        
+        // Create card back directly without trying to load images
         Rectangle cardBack = new Rectangle(80, 120);
         cardBack.setArcWidth(15);
         cardBack.setArcHeight(15);
-        cardBack.setFill(Color.valueOf("#E74C3C")); // Bright red color for better visibility
+        cardBack.setFill(Color.valueOf("#D32F2F")); // UNO red for card back
         cardBack.setStroke(Color.WHITE);
         cardBack.setStrokeWidth(3);
-        return cardBack;
+        cardView.getChildren().add(cardBack);
+        
+        // Create an oval for the UNO logo background
+        javafx.scene.shape.Ellipse logoBackground = new javafx.scene.shape.Ellipse(35, 25);
+        logoBackground.setFill(Color.WHITE);
+        logoBackground.setRotate(-20);
+        cardView.getChildren().add(logoBackground);
+        
+        // Add the UNO logo
+        Label unoLabel = new Label("UNO");
+        unoLabel.setStyle("-fx-font-size: 28px; -fx-font-weight: bold;");
+        unoLabel.setTextFill(Color.valueOf("#D32F2F")); // Match the card back color
+        cardView.getChildren().add(unoLabel);
+        
+        // Add a border around the UNO text
+        javafx.scene.shape.Ellipse logoBorder = new javafx.scene.shape.Ellipse(35, 25);
+        logoBorder.setFill(Color.TRANSPARENT);
+        logoBorder.setStroke(Color.BLACK);
+        logoBorder.setStrokeWidth(1);
+        logoBorder.setRotate(-20);
+        cardView.getChildren().add(logoBorder);
+        
+        return cardView;
+    }
+    
+    /**
+     * Helper method to convert CardColor to JavaFX Color.
+     *
+     * @param cardColor The CardColor enum value
+     * @return The corresponding JavaFX Color
+     */
+    private Color getColorFromCardColor(CardColor cardColor) {
+        switch (cardColor) {
+            case RED:
+                return RED_COLOR;
+            case GREEN:
+                return GREEN_COLOR;
+            case BLUE:
+                return BLUE_COLOR;
+            case YELLOW:
+                return YELLOW_COLOR;
+            case MULTI:
+                return Color.BLACK;
+            default:
+                return Color.BLACK;
+        }
     }
     
     /**
      * Handles a card being played by the user
-     * 
-     * @param card The card that was played
+     *
+     * @param cardView The card view that was clicked
+     * @param card The card model that was played
      */
-    private void playCard(StackPane card) {
-        if (currentPlayerIndex != 0) {
-            // Not the player's turn
+    private void playCard(StackPane cardView, Card card) {
+        // Check if a card has been placed on the discard pile to start the game
+        if (!firstCardPlayed) {
+            startFirstCardPlay();
             return;
         }
         
-        // Remove the card from the player's hand
-        bottomPlayerCardsContainer.getChildren().remove(card);
+        // Check if it's the player's turn
+        if (game.getCurrentPlayerIndex() != 0) {
+            return;
+        }
+        
+        // Check if the card can be played
+        Card topCard = game.getDiscardPile().peekCard();
+        if (topCard != null && !card.canPlayOn(topCard)) {
+            // Card cannot be played, show feedback
+            javafx.scene.effect.Glow glow = new javafx.scene.effect.Glow(0.8);
+            cardView.setEffect(glow);
+            
+            javafx.animation.Timeline timeline = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(Duration.ZERO, 
+                    new javafx.animation.KeyValue(glow.levelProperty(), 0.8)),
+                new javafx.animation.KeyFrame(Duration.millis(200), 
+                    new javafx.animation.KeyValue(glow.levelProperty(), 0)),
+                new javafx.animation.KeyFrame(Duration.millis(400), 
+                    new javafx.animation.KeyValue(glow.levelProperty(), 0.8)),
+                new javafx.animation.KeyFrame(Duration.millis(600), 
+                    new javafx.animation.KeyValue(glow.levelProperty(), 0))
+            );
+            
+            timeline.play();
+            return;
+        }
+        
+        // Play the card through the game model
+        boolean success = game.playCard(card);
+        if (!success) {
+            return; // Card couldn't be played due to game rules
+        }
+        
+        // Remove the card from the player's hand in UI
+        bottomPlayerCardsContainer.getChildren().remove(cardView);
         
         // Add animation for card being played
-        javafx.animation.TranslateTransition tt = new javafx.animation.TranslateTransition(Duration.millis(300), card);
+        javafx.animation.TranslateTransition tt = new javafx.animation.TranslateTransition(Duration.millis(300), cardView);
         tt.setToY(-100);
         tt.setOnFinished(event -> {
-            // Clear existing cards but keep the label
-            Label pileLabel = null;
-            for (javafx.scene.Node node : discardPileContainer.getChildren()) {
-                if (node instanceof Label) {
-                    pileLabel = (Label) node;
-                    break;
-                }
-            }
-            discardPileContainer.getChildren().clear();
-            
-            // Add the played card to the discard pile
-            discardPileContainer.getChildren().add(card);
-            
-            // Re-add the label to remain on top
-            if (pileLabel != null) {
-                discardPileContainer.getChildren().add(pileLabel);
-            } else {
-                // Create a new label if none exists
-                Label newLabel = new Label("DISCARD PILE");
-                newLabel.getStyleClass().add("card-pile-label");
-                discardPileContainer.getChildren().add(newLabel);
-            }
+            // Update the discard pile
+            setupDiscardPile();
             
             // Check for game ending conditions (empty hand)
-            if (bottomPlayerCardsContainer.getChildren().isEmpty()) {
-                handleGameEnd(true); // Player wins
+            if (game.isGameEnded() && game.getWinner() != null) {
+                handleGameEnd(game.getWinner().equals(game.getPlayers().get(0))); // True if human player won
                 return;
             }
             
-            // Move to the next player's turn
-            nextTurn();
+            // Update direction indicator if a reverse card was played
+            updateDirectionIndicator();
+            
+            // Update the turn label
+            updateTurnLabel();
+            
+            // Handle AI turns
+            handleAITurns();
         });
         tt.play();
     }
     
     /**
-     * Toggles the game direction.
+     * Handles AI player turns
      */
-    private void toggleDirection() {
-        isClockwise = !isClockwise;
-        updateDirectionIndicator();
+    private void handleAITurns() {
+        if (game.getCurrentPlayerIndex() > 0 && game.getCurrentPlayerIndex() < game.getPlayers().size()) {
+            // It's an AI player's turn
+            simpleAITurn(game.getCurrentPlayerIndex() - 1);
+        }
     }
     
     /**
-     * Updates the direction indicator image.
+     * Updates the direction indicator based on the game's direction
      */
     private void updateDirectionIndicator() {
+        boolean isClockwise = game.getDirection() == Direction.CLOCKWISE;
         String imagePath = isClockwise 
             ? "/images/arrow-clockwise.png" 
             : "/images/arrow-counterclockwise.png";
@@ -504,51 +964,24 @@ public class GameController {
     }
     
     /**
-     * Navigates back to the main menu.
+     * Updates the turn label to show which player's turn it is
      */
-    private void navigateToMainMenu() {
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/main-menu-view.fxml"));
-            Parent root = loader.load();
+    private void updateTurnLabel() {
+        int currentPlayerIndex = game.getCurrentPlayerIndex();
+        List<Player> players = game.getPlayers();
+        
+        if (currentPlayerIndex >= 0 && currentPlayerIndex < players.size()) {
+            Player currentPlayer = players.get(currentPlayerIndex);
             
-            Scene scene = new Scene(root);
-            
-            // Apply CSS styling
-            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
-            if (cssUrl != null) {
-                scene.getStylesheets().add(cssUrl.toExternalForm());
+            if (currentPlayerIndex == 0) {
+                // Local player's turn
+                currentTurnLabel.setText("YOUR TURN");
+                currentTurnLabel.setStyle("-fx-background-color: rgba(0, 153, 51, 0.8);"); // Green for player
+            } else {
+                // AI player's turn
+                currentTurnLabel.setText(currentPlayer.getName() + "'S TURN");
+                currentTurnLabel.setStyle("-fx-background-color: rgba(204, 51, 0, 0.8);"); // Red for opponent
             }
-            
-            Stage stage = (Stage) gamePane.getScene().getWindow();
-            stage.setScene(scene);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-    
-    /**
-     * Exits the game and returns to main menu with confirmation
-     */
-    private void exitGame() {
-        try {
-            // Show confirmation dialog
-            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-                javafx.scene.control.Alert.AlertType.CONFIRMATION,
-                "Are you sure you want to exit the game?",
-                javafx.scene.control.ButtonType.YES,
-                javafx.scene.control.ButtonType.NO
-            );
-            alert.setTitle("Exit Game");
-            alert.setHeaderText(null);
-            
-            // Handle the user's response
-            alert.showAndWait().ifPresent(response -> {
-                if (response == javafx.scene.control.ButtonType.YES) {
-                    navigateToMainMenu();
-                }
-            });
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
     
@@ -580,22 +1013,6 @@ public class GameController {
     }
     
     /**
-     * Updates the turn label to show which player's turn it is
-     */
-    private void updateTurnLabel() {
-        if (currentPlayerIndex == 0) {
-            // Local player's turn
-            currentTurnLabel.setText("YOUR TURN");
-            currentTurnLabel.setStyle("-fx-background-color: rgba(0, 153, 51, 0.8);"); // Green for player
-        } else if (currentPlayerIndex > 0 && currentPlayerIndex <= aiPlayers.size()) {
-            // AI player's turn
-            String aiName = aiPlayers.get(currentPlayerIndex - 1).getName();
-            currentTurnLabel.setText(aiName + "'S TURN");
-            currentTurnLabel.setStyle("-fx-background-color: rgba(204, 51, 0, 0.8);"); // Red for opponent
-        }
-    }
-    
-    /**
      * Advances to the next player's turn
      */
     private void nextTurn() {
@@ -603,19 +1020,15 @@ public class GameController {
             return;
         }
         
-        // Update current player index based on game direction
-        if (isClockwise) {
-            currentPlayerIndex = (currentPlayerIndex + 1) % (playerCount);
-        } else {
-            currentPlayerIndex = (currentPlayerIndex - 1 + playerCount) % (playerCount);
-        }
+        // Update current player index by calling game.nextPlayer() method
+        game.nextPlayer();
         
         // Update the turn label
         updateTurnLabel();
         
         // If it's AI's turn, simulate AI move
-        if (currentPlayerIndex != 0) {
-            simpleAITurn(currentPlayerIndex - 1);
+        if (game.getCurrentPlayerIndex() != 0) {
+            simpleAITurn(game.getCurrentPlayerIndex() - 1);
         }
     }
     
@@ -710,5 +1123,141 @@ public class GameController {
             pulseAnimation.setCycleCount(javafx.animation.Animation.INDEFINITE);
             pulseAnimation.play();
         }
+    }
+    
+    /**
+     * Navigates back to the main menu.
+     */
+    private void navigateToMainMenu() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/main-menu-view.fxml"));
+            Parent root = loader.load();
+            
+            Scene scene = new Scene(root);
+            
+            // Apply CSS styling
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
+            Stage stage = (Stage) gamePane.getScene().getWindow();
+            stage.setScene(scene);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Exits the game and returns to main menu with confirmation
+     */
+    private void exitGame() {
+        try {
+            // Show confirmation dialog
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.CONFIRMATION,
+                "Are you sure you want to exit the game?",
+                javafx.scene.control.ButtonType.YES,
+                javafx.scene.control.ButtonType.NO
+            );
+            alert.setTitle("Exit Game");
+            alert.setHeaderText(null);
+            
+            // Handle the user's response
+            alert.showAndWait().ifPresent(response -> {
+                if (response == javafx.scene.control.ButtonType.YES) {
+                    navigateToMainMenu();
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Sets up the player areas based on total player count.
+     * 
+     * @param playerCount The total number of players (2-4)
+     */
+    private void setupPlayerAreas(int playerCount) {
+        // Configure visibility based on player count
+        switch (playerCount) {
+            case 2: // 2 players: bottom and top
+                topPlayerArea.setVisible(true);
+                leftPlayerArea.setVisible(false);
+                rightPlayerArea.setVisible(false);
+                
+                if (!aiPlayers.isEmpty()) {
+                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
+                } else {
+                    topPlayerNameLabel.setText("Opponent 1");
+                }
+                break;
+                
+            case 3: // 3 players: bottom, top, and left
+                topPlayerArea.setVisible(true);
+                leftPlayerArea.setVisible(true);
+                rightPlayerArea.setVisible(false);
+                
+                if (aiPlayers.size() >= 2) {
+                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
+                    leftPlayerNameLabel.setText(aiPlayers.get(1).getName());
+                } else {
+                    topPlayerNameLabel.setText("Opponent 1");
+                    leftPlayerNameLabel.setText("Opponent 2");
+                }
+                break;
+                
+            case 4: // 4 players: all positions
+                topPlayerArea.setVisible(true);
+                leftPlayerArea.setVisible(true);
+                rightPlayerArea.setVisible(true);
+                
+                if (aiPlayers.size() >= 3) {
+                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
+                    leftPlayerNameLabel.setText(aiPlayers.get(1).getName());
+                    rightPlayerNameLabel.setText(aiPlayers.get(2).getName());
+                } else {
+                    topPlayerNameLabel.setText("Opponent 1");
+                    leftPlayerNameLabel.setText("Opponent 2");
+                    rightPlayerNameLabel.setText("Opponent 3");
+                }
+                break;
+                
+            default: // Default to 2 players if invalid count
+                topPlayerArea.setVisible(true);
+                leftPlayerArea.setVisible(false);
+                rightPlayerArea.setVisible(false);
+                
+                topPlayerNameLabel.setText("Opponent 1");
+                break;
+        }
+        
+        // For grid layout - must keep areas managed but transparent
+        leftPlayerArea.setManaged(true);
+        rightPlayerArea.setManaged(true);
+        
+        // Make invisible areas transparent instead of completely hiding them
+        if (!leftPlayerArea.isVisible()) {
+            leftPlayerArea.setOpacity(0);
+            leftPlayerNameLabel.setOpacity(0);
+        } else {
+            leftPlayerArea.setOpacity(1);
+            leftPlayerNameLabel.setOpacity(1);
+        }
+        
+        if (!rightPlayerArea.isVisible()) {
+            rightPlayerArea.setOpacity(0);
+            rightPlayerNameLabel.setOpacity(0);
+        } else {
+            rightPlayerArea.setOpacity(1);
+            rightPlayerNameLabel.setOpacity(1);
+        }
+        
+        // Ensure all labels are clearly visible
+        topPlayerNameLabel.toFront();
+        leftPlayerNameLabel.toFront();
+        rightPlayerNameLabel.toFront();
+        bottomPlayerNameLabel.toFront();
     }
 } 

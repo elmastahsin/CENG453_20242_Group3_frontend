@@ -32,7 +32,6 @@ module metu.ceng.ceng453_20242_group3_frontend {
     exports metu.ceng.ceng453_20242_group3_frontend.features.game.controller to javafx.fxml;
     opens metu.ceng.ceng453_20242_group3_frontend.features.game.controller to javafx.fxml;
     exports metu.ceng.ceng453_20242_group3_frontend.features.game.model;
-    exports metu.ceng.ceng453_20242_group3_frontend.features.game.model.card;
     exports metu.ceng.ceng453_20242_group3_frontend.features.game.util;
     
     // Leaderboard feature

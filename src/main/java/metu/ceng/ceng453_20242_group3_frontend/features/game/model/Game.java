@@ -4,6 +4,7 @@ import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 
 /**
@@ -21,6 +22,7 @@ public class Game {
     private boolean gameStarted;
     private boolean gameEnded;
     private Player winner;
+    private final Random random;
 
     /**
      * Constructor for creating a new game.
@@ -40,6 +42,7 @@ public class Game {
         this.gameStarted = false;
         this.gameEnded = false;
         this.winner = null;
+        this.random = new Random();
     }
 
     /**
@@ -215,17 +218,37 @@ public class Game {
         // Deal cards to players
         dealInitialCards();
 
-        // Move one card from draw pile to discard pile to start the game
-        Card initialCard = drawPile.drawCard();
-        discardPile.addCard(initialCard);
+        // Select a random player to start
+        currentPlayerIndex = random.nextInt(players.size());
 
         // Set the game as started
         gameStarted = true;
-        
-        // Update which cards are playable for the current player
-        updatePlayableCards();
 
         return true;
+    }
+
+    /**
+     * Places the first card from the draw pile onto the discard pile to start the game.
+     * This should be called after the game has started and players are ready to play.
+     * 
+     * @return The card placed on the discard pile
+     */
+    public Card startFirstTurn() {
+        // Move one card from draw pile to discard pile to start the game
+        Card initialCard = drawPile.drawCard();
+        // Keep drawing until we get a number card (not an action card)
+        while (initialCard != null && !initialCard.isNumberCard()) {
+            // Put the action card back in the deck and shuffle
+            drawPile.addCard(initialCard);
+            drawPile.shuffle();
+            initialCard = drawPile.drawCard();
+        }
+        
+        if (initialCard != null) {
+            discardPile.addCard(initialCard);
+        }
+        
+        return initialCard;
     }
 
     /**
@@ -334,17 +357,28 @@ public class Game {
      * @param card The card that was played
      */
     private void handleSpecialCard(Card card) {
-        switch (card.getType()) {
+        // If it's a number card or a standard wild card, just move to the next player
+        if (card.isNumberCard() || card.getAction() == CardAction.WILD) {
+            nextPlayer();
+            return;
+        }
+        
+        // Handle action cards
+        switch (card.getAction()) {
             case SKIP:
                 skipPlayer();
                 break;
+                
             case REVERSE:
                 reverseDirection();
                 // In a two-player game, Reverse acts like Skip
                 if (players.size() == 2) {
                     nextPlayer();
+                } else {
+                    nextPlayer();
                 }
                 break;
+                
             case DRAW_TWO:
                 Player nextPlayer = nextPlayer();
                 // Draw two cards for the next player
@@ -357,6 +391,7 @@ public class Game {
                 // Skip the player who drew cards
                 nextPlayer();
                 break;
+                
             case WILD_DRAW_FOUR:
                 nextPlayer = nextPlayer();
                 // Draw four cards for the next player
@@ -369,8 +404,9 @@ public class Game {
                 // Skip the player who drew cards
                 nextPlayer();
                 break;
+                
             default:
-                // For number cards and Wild cards, just move to the next player
+                // For any other card types, just move to the next player
                 nextPlayer();
                 break;
         }
