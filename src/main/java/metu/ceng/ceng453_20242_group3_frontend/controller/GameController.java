@@ -3,6 +3,8 @@ package metu.ceng.ceng453_20242_group3_frontend.controller;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.ArrayList;
+import java.net.URL;
 
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -10,9 +12,9 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
@@ -21,7 +23,9 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import javafx.util.Pair;
+import metu.ceng.ceng453_20242_group3_frontend.model.ComputerAIPlayer;
 import metu.ceng.ceng453_20242_group3_frontend.util.SessionManager;
+import javafx.util.Duration;
 
 /**
  * Controller for the game view.
@@ -29,67 +33,37 @@ import metu.ceng.ceng453_20242_group3_frontend.util.SessionManager;
 public class GameController {
     
     @FXML
-    private BorderPane gamePane;
+    private AnchorPane gamePane;
+    
+    // Player areas
+    @FXML
+    private HBox leftPlayerArea;
     
     @FXML
-    private ImageView logoImageView;
+    private HBox rightPlayerArea;
     
     @FXML
-    private Label opponentNameLabel;
+    private VBox topPlayerArea;
     
     @FXML
-    private HBox opponentCardsContainer;
+    private VBox bottomPlayerArea;
+    
+    // Player name labels
+    @FXML
+    private Label topPlayerNameLabel;
     
     @FXML
-    private Button skipButton;
+    private Label leftPlayerNameLabel;
     
     @FXML
-    private Button reverseButton;
+    private Label rightPlayerNameLabel;
     
     @FXML
-    private Button drawTwoButton;
+    private Label bottomPlayerNameLabel;
     
+    // Card containers
     @FXML
-    private Button wildButton;
-    
-    @FXML
-    private Button wildDrawFourButton;
-    
-    @FXML
-    private Label discardLabel;
-    
-    @FXML
-    private ImageView clockwiseIndicator;
-    
-    @FXML
-    private ImageView counterClockwiseIndicator;
-    
-    @FXML
-    private StackPane drawPileContainer;
-    
-    @FXML
-    private StackPane discardPileContainer;
-    
-    @FXML
-    private Label turnIndicatorLabel;
-    
-    @FXML
-    private Label playerNameLabel;
-    
-    @FXML
-    private VBox chatMessagesContainer;
-    
-    @FXML
-    private Button sendMessageButton;
-    
-    @FXML
-    private ListView<String> leaderboardListView;
-    
-    @FXML
-    private HBox playerCardsContainer;
-    
-    @FXML
-    private Button quitButton;
+    private HBox topPlayerCardsContainer;
     
     @FXML
     private VBox leftPlayerCardsContainer;
@@ -98,10 +72,30 @@ public class GameController {
     private VBox rightPlayerCardsContainer;
     
     @FXML
-    private StackPane currentCardContainer;
+    private HBox bottomPlayerCardsContainer;
+    
+    // Game elements
+    @FXML
+    private StackPane drawPileContainer;
+    
+    @FXML
+    private StackPane discardPileContainer;
     
     @FXML
     private ImageView directionIndicator;
+    
+    @FXML
+    private Button exitGameButton;
+    
+    @FXML
+    private Label currentTurnLabel;
+    
+    // Game state
+    private boolean isClockwise = true;
+    private int playerCount = 2; // Default to 2 players
+    private List<ComputerAIPlayer> aiPlayers = new ArrayList<>();
+    private int currentPlayerIndex = 0; // 0 = local player, 1+ = AI opponents
+    private boolean isGameRunning = true;
     
     // Card colors
     private final Color RED_COLOR = Color.rgb(227, 35, 45);
@@ -109,61 +103,157 @@ public class GameController {
     private final Color BLUE_COLOR = Color.rgb(0, 122, 193);
     private final Color YELLOW_COLOR = Color.rgb(243, 206, 37);
     
-    // Direction
-    private boolean isClockwise = true;
-    
     @FXML
     private void initialize() {
-        // Set player name from session
+        // Set local player name from session
         if (SessionManager.getInstance().isLoggedIn()) {
             String username = SessionManager.getInstance().getCurrentUser().getUsername();
-            turnIndicatorLabel.setText(username + " (You)");
+            bottomPlayerNameLabel.setText(username);
         }
         
-        // Set up action buttons
-        setupActionButtons();
+        // Set up exit game button
+        exitGameButton.setOnAction(event -> exitGame());
         
-        // Create draw and discard piles
-        setupCardPiles();
-        
-        // Add sample player cards
-        createPlayerCards();
-        
-        // Add sample opponent cards
-        createOpponentCards();
-        
-        // Set up leaderboard
-        setupLeaderboard();
-        
-        // Set initial direction indicator
+        // Update direction indicator
         updateDirectionIndicator();
         
-        // Set up quit button
-        quitButton.setOnAction(event -> navigateToMainMenu());
-    }
-    
-    private void setupActionButtons() {
-        skipButton.setOnAction(event -> playSpecialCard("Skip"));
-        reverseButton.setOnAction(event -> {
-            playSpecialCard("Reverse");
-            toggleDirection();
-        });
-        drawTwoButton.setOnAction(event -> playSpecialCard("Draw Two"));
-        wildButton.setOnAction(event -> playSpecialCard("Wild"));
-        wildDrawFourButton.setOnAction(event -> playSpecialCard("Wild Draw Four"));
-    }
-    
-    private void setupCardPiles() {
-        // No need to add anything to drawPileContainer as it's already defined in the FXML
+        // Initialize turn label
+        updateTurnLabel();
         
-        // Create discard pile with a sample card
-        StackPane discardCard = createCard("9", RED_COLOR);
-        currentCardContainer.getChildren().clear();
-        currentCardContainer.getChildren().add(discardCard);
+        // Set up game table animations
+        setupGameTableAnimations();
     }
     
-    private void createPlayerCards() {
-        // Sample player cards
+    /**
+     * Initializes the game with the specified parameters.
+     * 
+     * @param gameMode The game mode
+     * @param aiPlayerCount Number of AI players
+     * @param initialCardCount Number of initial cards for each player
+     */
+    public void initializeGame(String gameMode, int aiPlayerCount, int initialCardCount) {
+        // Set player count (user + AI players)
+        this.playerCount = aiPlayerCount + 1;
+        
+        // Initialize AI players
+        this.aiPlayers.clear();
+        for (int i = 0; i < aiPlayerCount; i++) {
+            String opponentName = "Opponent " + (i+1);
+            
+            aiPlayers.add(new ComputerAIPlayer(opponentName));
+        }
+        
+        // Configure player areas based on player count
+        setupPlayerAreas(this.playerCount);
+        
+        // Generate cards
+        generatePlayerCards(initialCardCount);
+        generateOpponentCards(aiPlayerCount, initialCardCount);
+        
+        // Start with local player's turn
+        this.currentPlayerIndex = 0;
+        
+        // Update direction indicator
+        updateDirectionIndicator();
+    }
+    
+    /**
+     * Sets up the player areas based on total player count.
+     * 
+     * @param playerCount The total number of players (2-4)
+     */
+    private void setupPlayerAreas(int playerCount) {
+        // Configure visibility based on player count
+        switch (playerCount) {
+            case 2: // 2 players: bottom and top
+                topPlayerArea.setVisible(true);
+                leftPlayerArea.setVisible(false);
+                rightPlayerArea.setVisible(false);
+                
+                if (!aiPlayers.isEmpty()) {
+                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
+                } else {
+                    topPlayerNameLabel.setText("Opponent 1");
+                }
+                break;
+                
+            case 3: // 3 players: bottom, top, and left
+                topPlayerArea.setVisible(true);
+                leftPlayerArea.setVisible(true);
+                rightPlayerArea.setVisible(false);
+                
+                if (aiPlayers.size() >= 2) {
+                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
+                    leftPlayerNameLabel.setText(aiPlayers.get(1).getName());
+                } else {
+                    topPlayerNameLabel.setText("Opponent 1");
+                    leftPlayerNameLabel.setText("Opponent 2");
+                }
+                break;
+                
+            case 4: // 4 players: all positions
+                topPlayerArea.setVisible(true);
+                leftPlayerArea.setVisible(true);
+                rightPlayerArea.setVisible(true);
+                
+                if (aiPlayers.size() >= 3) {
+                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
+                    leftPlayerNameLabel.setText(aiPlayers.get(1).getName());
+                    rightPlayerNameLabel.setText(aiPlayers.get(2).getName());
+                } else {
+                    topPlayerNameLabel.setText("Opponent 1");
+                    leftPlayerNameLabel.setText("Opponent 2");
+                    rightPlayerNameLabel.setText("Opponent 3");
+                }
+                break;
+                
+            default: // Default to 2 players if invalid count
+                topPlayerArea.setVisible(true);
+                leftPlayerArea.setVisible(false);
+                rightPlayerArea.setVisible(false);
+                
+                topPlayerNameLabel.setText("Opponent 1");
+                break;
+        }
+        
+        // For grid layout - must keep areas managed but transparent
+        leftPlayerArea.setManaged(true);
+        rightPlayerArea.setManaged(true);
+        
+        // Make invisible areas transparent instead of completely hiding them
+        if (!leftPlayerArea.isVisible()) {
+            leftPlayerArea.setOpacity(0);
+            leftPlayerNameLabel.setOpacity(0);
+        } else {
+            leftPlayerArea.setOpacity(1);
+            leftPlayerNameLabel.setOpacity(1);
+        }
+        
+        if (!rightPlayerArea.isVisible()) {
+            rightPlayerArea.setOpacity(0);
+            rightPlayerNameLabel.setOpacity(0);
+        } else {
+            rightPlayerArea.setOpacity(1);
+            rightPlayerNameLabel.setOpacity(1);
+        }
+        
+        // Ensure all labels are clearly visible
+        topPlayerNameLabel.toFront();
+        leftPlayerNameLabel.toFront();
+        rightPlayerNameLabel.toFront();
+        bottomPlayerNameLabel.toFront();
+    }
+    
+    /**
+     * Generates cards for the local player.
+     * 
+     * @param cardCount Number of cards to generate
+     */
+    private void generatePlayerCards(int cardCount) {
+        // Clear existing cards
+        bottomPlayerCardsContainer.getChildren().clear();
+        
+        // Sample player cards - removed Wild card as requested
         List<Pair<String, Color>> playerCards = Arrays.asList(
             new Pair<>("7", BLUE_COLOR),
             new Pair<>("2", GREEN_COLOR),
@@ -171,74 +261,75 @@ public class GameController {
             new Pair<>("0", RED_COLOR),
             new Pair<>("2", RED_COLOR),
             new Pair<>("2", BLUE_COLOR),
-            new Pair<>("Wild", null)
+            new Pair<>("5", YELLOW_COLOR)
         );
         
-        for (Pair<String, Color> cardInfo : playerCards) {
+        // Add cards to player's hand
+        for (int i = 0; i < Math.min(cardCount, playerCards.size()); i++) {
+            Pair<String, Color> cardInfo = playerCards.get(i);
             StackPane card = createCard(cardInfo.getKey(), cardInfo.getValue());
             card.setOnMouseClicked(event -> playCard(card));
-            playerCardsContainer.getChildren().add(card);
+            bottomPlayerCardsContainer.getChildren().add(card);
         }
     }
     
-    private void createOpponentCards() {
-        // Create opponent cards for top opponent
-        for (int i = 0; i < 7; i++) {
+    /**
+     * Generates cards for all opponents.
+     * 
+     * @param opponentCount Number of opponents
+     * @param cardCount Number of cards per opponent
+     */
+    private void generateOpponentCards(int opponentCount, int cardCount) {
+        // Clear existing cards
+        topPlayerCardsContainer.getChildren().clear();
+        leftPlayerCardsContainer.getChildren().clear();
+        rightPlayerCardsContainer.getChildren().clear();
+        
+        // Always generate top opponent cards (1+ opponents)
+        for (int i = 0; i < cardCount; i++) {
             Rectangle cardBack = createCardBack();
             StackPane card = new StackPane(cardBack);
             card.getStyleClass().add("uno-card");
-            opponentCardsContainer.getChildren().add(card);
+            card.setStyle("-fx-opacity: 1.0;"); // Make sure cards are fully visible
+            topPlayerCardsContainer.getChildren().add(card);
         }
         
-        // Create cards for left computer player
-        for (int i = 0; i < 8; i++) {
+        // Generate left opponent cards (2+ opponents) with horizontal orientation
+        for (int i = 0; i < cardCount; i++) {
             Rectangle cardBack = createCardBack();
-            cardBack.setWidth(60);
-            cardBack.setHeight(90);
+            // Use original size but rotate the card container
             StackPane card = new StackPane(cardBack);
             card.getStyleClass().add("uno-card");
+            card.setStyle("-fx-opacity: 1.0;"); // Make sure cards are fully visible
+            
+            // Apply rotation to make cards horizontal
+            card.setRotate(90);
+            
             leftPlayerCardsContainer.getChildren().add(card);
         }
         
-        // Create cards for right computer player
-        for (int i = 0; i < 9; i++) {
+        // Generate right opponent cards (3 opponents) with horizontal orientation
+        for (int i = 0; i < cardCount; i++) {
             Rectangle cardBack = createCardBack();
-            cardBack.setWidth(60);
-            cardBack.setHeight(90);
+            // Use original size but rotate the card container
             StackPane card = new StackPane(cardBack);
             card.getStyleClass().add("uno-card");
+            card.setStyle("-fx-opacity: 1.0;"); // Make sure cards are fully visible
+            
+            // Apply rotation to make cards horizontal
+            card.setRotate(-90);
+            
             rightPlayerCardsContainer.getChildren().add(card);
         }
     }
     
-    private void setupLeaderboard() {
-        // Sample leaderboard data
-        leaderboardListView.getItems().addAll(
-            "1 Emily",
-            "2 Michael",
-            "3 David"
-        );
-    }
-    
-    private void addSampleChatMessages() {
-        addChatMessage("Hello!");
-        addChatMessage("Good luck!");
-        addChatMessage("gg!");
-    }
-    
-    private void addChatMessage(String message) {
-        Label messageLabel = new Label(message);
-        messageLabel.setWrapText(true);
-        messageLabel.setMaxWidth(Double.MAX_VALUE);
-        messageLabel.getStyleClass().add("chat-message");
-        chatMessagesContainer.getChildren().add(messageLabel);
-    }
-    
-    private void sendChatMessage() {
-        // This would send a message to other players in a real implementation
-        addChatMessage("You: Message sent");
-    }
-    
+    /**
+     * Creates a card with the specified value and color.
+     * 
+     * @param value The value of the card
+     * @param color The color of the card
+     * @return A StackPane representing the card
+     */
     private StackPane createCard(String value, Color color) {
         StackPane card = new StackPane();
         card.setPrefSize(80, 120);
@@ -324,38 +415,85 @@ public class GameController {
         return card;
     }
     
+    /**
+     * Creates a card back for opponent cards.
+     * 
+     * @return A Rectangle representing the card back
+     */
     private Rectangle createCardBack() {
         Rectangle cardBack = new Rectangle(80, 120);
         cardBack.setArcWidth(15);
         cardBack.setArcHeight(15);
-        cardBack.setFill(Color.valueOf("#1A6877"));
+        cardBack.setFill(Color.valueOf("#E74C3C")); // Bright red color for better visibility
         cardBack.setStroke(Color.WHITE);
-        cardBack.setStrokeWidth(2);
+        cardBack.setStrokeWidth(3);
         return cardBack;
     }
     
+    /**
+     * Handles a card being played by the user
+     * 
+     * @param card The card that was played
+     */
     private void playCard(StackPane card) {
-        // Remove the selected card from player's hand
-        playerCardsContainer.getChildren().remove(card);
+        if (currentPlayerIndex != 0) {
+            // Not the player's turn
+            return;
+        }
         
-        // Clear the discard pile and add the new card
-        discardPileContainer.getChildren().clear();
-        discardPileContainer.getChildren().add(card);
+        // Remove the card from the player's hand
+        bottomPlayerCardsContainer.getChildren().remove(card);
         
-        // Reset the click handler
-        card.setOnMouseClicked(null);
+        // Add animation for card being played
+        javafx.animation.TranslateTransition tt = new javafx.animation.TranslateTransition(Duration.millis(300), card);
+        tt.setToY(-100);
+        tt.setOnFinished(event -> {
+            // Clear existing cards but keep the label
+            Label pileLabel = null;
+            for (javafx.scene.Node node : discardPileContainer.getChildren()) {
+                if (node instanceof Label) {
+                    pileLabel = (Label) node;
+                    break;
+                }
+            }
+            discardPileContainer.getChildren().clear();
+            
+            // Add the played card to the discard pile
+            discardPileContainer.getChildren().add(card);
+            
+            // Re-add the label to remain on top
+            if (pileLabel != null) {
+                discardPileContainer.getChildren().add(pileLabel);
+            } else {
+                // Create a new label if none exists
+                Label newLabel = new Label("DISCARD PILE");
+                newLabel.getStyleClass().add("card-pile-label");
+                discardPileContainer.getChildren().add(newLabel);
+            }
+            
+            // Check for game ending conditions (empty hand)
+            if (bottomPlayerCardsContainer.getChildren().isEmpty()) {
+                handleGameEnd(true); // Player wins
+                return;
+            }
+            
+            // Move to the next player's turn
+            nextTurn();
+        });
+        tt.play();
     }
     
-    private void playSpecialCard(String type) {
-        System.out.println("Playing special card: " + type);
-        // In a real implementation, this would send the action to the game server
-    }
-    
+    /**
+     * Toggles the game direction.
+     */
     private void toggleDirection() {
         isClockwise = !isClockwise;
         updateDirectionIndicator();
     }
     
+    /**
+     * Updates the direction indicator image.
+     */
     private void updateDirectionIndicator() {
         String imagePath = isClockwise 
             ? "/images/arrow-clockwise.png" 
@@ -373,10 +511,204 @@ public class GameController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/main-menu-view.fxml"));
             Parent root = loader.load();
             
+            Scene scene = new Scene(root);
+            
+            // Apply CSS styling
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
             Stage stage = (Stage) gamePane.getScene().getWindow();
-            stage.setScene(new Scene(root));
+            stage.setScene(scene);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Exits the game and returns to main menu with confirmation
+     */
+    private void exitGame() {
+        try {
+            // Show confirmation dialog
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.CONFIRMATION,
+                "Are you sure you want to exit the game?",
+                javafx.scene.control.ButtonType.YES,
+                javafx.scene.control.ButtonType.NO
+            );
+            alert.setTitle("Exit Game");
+            alert.setHeaderText(null);
+            
+            // Handle the user's response
+            alert.showAndWait().ifPresent(response -> {
+                if (response == javafx.scene.control.ButtonType.YES) {
+                    navigateToMainMenu();
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Simulates an AI player's turn with a delay
+     * 
+     * @param aiIndex The index of the AI player
+     */
+    private void simpleAITurn(int aiIndex) {
+        if (aiIndex < 0 || aiIndex >= aiPlayers.size()) {
+            return;
+        }
+        
+        ComputerAIPlayer ai = aiPlayers.get(aiIndex);
+        
+        // Get the AI thinking time
+        int thinkTime = ai.takeTurn();
+        
+        // Use JavaFX animation to delay the turn
+        javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.millis(thinkTime));
+        pause.setOnFinished(event -> {
+            // AI completes turn
+            ai.finishTurn();
+            
+            // Advance to next player
+            nextTurn();
+        });
+        pause.play();
+    }
+    
+    /**
+     * Updates the turn label to show which player's turn it is
+     */
+    private void updateTurnLabel() {
+        if (currentPlayerIndex == 0) {
+            // Local player's turn
+            currentTurnLabel.setText("YOUR TURN");
+            currentTurnLabel.setStyle("-fx-background-color: rgba(0, 153, 51, 0.8);"); // Green for player
+        } else if (currentPlayerIndex > 0 && currentPlayerIndex <= aiPlayers.size()) {
+            // AI player's turn
+            String aiName = aiPlayers.get(currentPlayerIndex - 1).getName();
+            currentTurnLabel.setText(aiName + "'S TURN");
+            currentTurnLabel.setStyle("-fx-background-color: rgba(204, 51, 0, 0.8);"); // Red for opponent
+        }
+    }
+    
+    /**
+     * Advances to the next player's turn
+     */
+    private void nextTurn() {
+        if (!isGameRunning) {
+            return;
+        }
+        
+        // Update current player index based on game direction
+        if (isClockwise) {
+            currentPlayerIndex = (currentPlayerIndex + 1) % (playerCount);
+        } else {
+            currentPlayerIndex = (currentPlayerIndex - 1 + playerCount) % (playerCount);
+        }
+        
+        // Update the turn label
+        updateTurnLabel();
+        
+        // If it's AI's turn, simulate AI move
+        if (currentPlayerIndex != 0) {
+            simpleAITurn(currentPlayerIndex - 1);
+        }
+    }
+    
+    /**
+     * Handles the end of the game
+     * 
+     * @param isPlayerWinner Whether the local player won the game
+     */
+    private void handleGameEnd(boolean isPlayerWinner) {
+        isGameRunning = false;
+        
+        // Create alert dialog
+        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+            javafx.scene.control.Alert.AlertType.INFORMATION
+        );
+        
+        alert.setTitle("Game Over");
+        
+        if (isPlayerWinner) {
+            alert.setHeaderText("You Win!");
+            alert.setContentText("Congratulations, you have won the game!");
+        } else {
+            alert.setHeaderText("You Lose!");
+            alert.setContentText("Better luck next time!");
+        }
+        
+        // Show dialog and return to main menu when closed
+        alert.showAndWait().ifPresent(response -> exitGame());
+    }
+    
+    /**
+     * Sets up subtle animations for the game table to enhance visual appeal
+     */
+    private void setupGameTableAnimations() {
+        // Find the game table element
+        javafx.scene.Node gameTable = null;
+        
+        // Look through the StackPane in the center of the grid
+        for (javafx.scene.Node node : gamePane.getChildrenUnmodifiable()) {
+            if (node instanceof javafx.scene.layout.GridPane) {
+                javafx.scene.layout.GridPane gridPane = (javafx.scene.layout.GridPane) node;
+                
+                for (javafx.scene.Node child : gridPane.getChildren()) {
+                    // Find the center stack pane
+                    Integer colIndex = javafx.scene.layout.GridPane.getColumnIndex(child);
+                    Integer rowIndex = javafx.scene.layout.GridPane.getRowIndex(child);
+                    
+                    if (colIndex != null && rowIndex != null && colIndex == 1 && rowIndex == 1) {
+                        if (child instanceof javafx.scene.layout.StackPane) {
+                            javafx.scene.layout.StackPane centerPane = (javafx.scene.layout.StackPane) child;
+                            
+                            // Find the game table inside the stack pane
+                            for (javafx.scene.Node tableCandidate : centerPane.getChildren()) {
+                                if (tableCandidate instanceof javafx.scene.layout.StackPane &&
+                                    tableCandidate.getStyleClass().contains("game-table")) {
+                                    gameTable = tableCandidate;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Create pulsing animation for the game table
+        if (gameTable != null) {
+            javafx.scene.Node finalGameTable = gameTable;
+            
+            // Create a pulsing glow effect
+            javafx.animation.Timeline pulseAnimation = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(javafx.util.Duration.ZERO, 
+                    new javafx.animation.KeyValue(
+                        finalGameTable.effectProperty(),
+                        new javafx.scene.effect.DropShadow(15, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7))
+                    )
+                ),
+                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1.5), 
+                    new javafx.animation.KeyValue(
+                        finalGameTable.effectProperty(),
+                        new javafx.scene.effect.DropShadow(25, javafx.scene.paint.Color.rgb(255, 255, 255, 0.3))
+                    )
+                ),
+                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(3), 
+                    new javafx.animation.KeyValue(
+                        finalGameTable.effectProperty(),
+                        new javafx.scene.effect.DropShadow(15, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7))
+                    )
+                )
+            );
+            
+            pulseAnimation.setCycleCount(javafx.animation.Animation.INDEFINITE);
+            pulseAnimation.play();
         }
     }
 } 
