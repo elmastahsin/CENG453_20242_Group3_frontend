@@ -37,6 +37,8 @@ import metu.ceng.ceng453_20242_group3_frontend.features.game.model.PlayerCount;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Direction;
 import metu.ceng.ceng453_20242_group3_frontend.features.common.util.SessionManager;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.CardRenderer;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ColorSelectionDialog;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ColorNotification;
 
 /**
  * Controller for the game view.
@@ -180,6 +182,13 @@ public class GameController {
         
         // Start the game (this deals cards and initializes the discard pile)
         game.startGame();
+        
+        // When a new game starts, mark all cards as playable for the initial play
+        for (Player player : game.getPlayers()) {
+            for (Card card : player.getHand()) {
+                card.setPlayable(true);
+            }
+        }
         
         // Update the UI
         updateUI();
@@ -336,6 +345,11 @@ public class GameController {
                 // Add rotation after animation completes
                 cardView.setRotate(-5 + (Math.random() * 10));
                 
+                // Set the current color based on the card
+                if (initialCard.getColor() != CardColor.MULTI) {
+                    game.setCurrentColor(initialCard.getColor());
+                }
+                
                 // Update playable cards
                 updatePlayableCards();
                 
@@ -350,6 +364,12 @@ public class GameController {
             });
             
             animation.play();
+        } else {
+            // In case we couldn't get an initial card, still allow play to continue
+            firstCardPlayed = true;
+            updatePlayableCards();
+            updateTurnLabel();
+            updatePlayerAreaAnimations();
         }
     }
     
@@ -357,26 +377,13 @@ public class GameController {
      * Updates which cards are playable based on the top discard card
      */
     private void updatePlayableCards() {
-        Card topCard = game.getDiscardPile().peekCard();
-        if (topCard == null) return;
+        if (game == null) return;
         
-        // Only update UI for human player (index 0)
-        if (game.getCurrentPlayerIndex() == 0) {
-            Player humanPlayer = game.getPlayers().get(0);
-            
-            // Reset all cards to non-playable
-            for (Card card : humanPlayer.getHand()) {
-                card.setPlayable(false);
-            }
-            
-            // Set cards that can be played as playable
-            for (Card card : humanPlayer.getHand()) {
-                card.setPlayable(card.canPlayOn(topCard));
-            }
-            
-            // Refresh the card visuals
-            updatePlayerHandVisuals();
-        }
+        // Have the game model update which cards are playable
+        game.updatePlayableCards();
+        
+        // Refresh the card visuals for human player to show which ones are playable
+        updatePlayerHandVisuals();
     }
     
     /**
@@ -385,17 +392,23 @@ public class GameController {
     private void updatePlayerHandVisuals() {
         bottomPlayerCardsContainer.getChildren().clear();
         
-        if (game.getPlayers().isEmpty()) return;
+        if (game == null || game.getPlayers().isEmpty()) return;
         
         Player humanPlayer = game.getPlayers().get(0);
         for (Card card : humanPlayer.getHand()) {
             StackPane cardView = createCardView(card);
-            cardView.setOnMouseClicked(event -> playCard(cardView, card));
             
-            // Add glow effect to playable cards
+            // Only enable click for playable cards
             if (card.isPlayable() && game.getCurrentPlayerIndex() == 0) {
-                cardView.setEffect(new javafx.scene.effect.DropShadow(10, Color.WHITE));
+                // Add glow effect to playable cards
+                cardView.setEffect(new javafx.scene.effect.DropShadow(15, Color.GOLD));
                 cardView.setStyle("-fx-cursor: hand;");
+                cardView.setOnMouseClicked(event -> playCard(cardView, card));
+            } else {
+                // For unplayable cards, set a dimmed appearance
+                cardView.setOpacity(0.8);
+                // Still allow clicking but will show error message if attempted
+                cardView.setOnMouseClicked(event -> playCard(cardView, card));
             }
             
             bottomPlayerCardsContainer.getChildren().add(cardView);
@@ -403,20 +416,386 @@ public class GameController {
     }
     
     /**
-     * Sets up the discard pile with the top card.
+     * Plays a card from the player's hand.
+     * 
+     * @param cardView The card view to animate
+     * @param card The card model to play
+     */
+    private void playCard(StackPane cardView, Card card) {
+        // Check if the game is running
+        if (!isGameRunning || game == null) {
+            return;
+        }
+        
+        Player currentPlayer = game.getCurrentPlayer();
+        
+        // Make sure it's the player's turn
+        if (currentPlayer.isAI() || game.getCurrentPlayerIndex() != 0) {
+            return;
+        }
+        
+        // In the initial state (discard pile empty), all cards are playable
+        if (game.isDiscardPileEmpty()) {
+            System.out.println("Playing first card in the game");
+            // Set the first card played flag (for initial card)
+            firstCardPlayed = true;
+            
+            // For wild cards, handle color selection
+            if (card.isWildCard()) {
+                handleWildCardColorSelection(card, () -> {
+                    finishCardPlay(cardView, card);
+                });
+            } else {
+                // For regular cards, set the game color to the card's color
+                if (card.getColor() != CardColor.MULTI) {
+                    game.setCurrentColor(card.getColor());
+                }
+                finishCardPlay(cardView, card);
+            }
+            return;
+        }
+        
+        // Check if the card is playable according to UNO rules
+        if (!card.isPlayable()) {
+            // Show a message that this card can't be played
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.INFORMATION
+            );
+            alert.setTitle("Invalid Move");
+            alert.setHeaderText("Can't Play This Card");
+            alert.setContentText("This card doesn't match the color or value of the top card.");
+            alert.show();
+            return;
+        }
+        
+        // Set the first card played flag (for initial card)
+        firstCardPlayed = true;
+        
+        // Check for wild cards that need color selection
+        if (card.isWildCard()) {
+            handleWildCardColorSelection(card, () -> {
+                finishCardPlay(cardView, card);
+            });
+        } else {
+            finishCardPlay(cardView, card);
+        }
+    }
+    
+    /**
+     * Handles color selection for wild cards played by the human player.
+     * 
+     * @param card The wild card being played
+     * @param onColorSelected Callback for when color selection is complete
+     */
+    private void handleWildCardColorSelection(Card card, Runnable onColorSelected) {
+        Stage stage = (Stage) gamePane.getScene().getWindow();
+        
+        ColorSelectionDialog dialog = new ColorSelectionDialog(stage, selectedColor -> {
+            // Set the current color in the game
+            game.setCurrentColor(selectedColor);
+            
+            // Execute the callback
+            onColorSelected.run();
+        });
+        
+        // Show the dialog
+        dialog.show();
+    }
+    
+    /**
+     * Completes playing a card after any required user input (like wild card color selection).
+     * 
+     * @param cardView The card view to animate
+     * @param card The card model to play
+     */
+    private void finishCardPlay(StackPane cardView, Card card) {
+        // Remove card from player's hand visually
+        bottomPlayerCardsContainer.getChildren().remove(cardView);
+        
+        // First update the game model - this needs to happen before animation
+        boolean success = game.playCard(card);
+        
+        if (success) {
+            // Now handle animation - but don't rely on the cardView which might be null after removal
+            StackPane cardViewCopy = CardRenderer.createCardView(card);
+            
+            // Position the card view at the same position as the original card
+            cardViewCopy.setLayoutX(cardView.getLayoutX());
+            cardViewCopy.setLayoutY(cardView.getLayoutY());
+            gamePane.getChildren().add(cardViewCopy);
+            
+            // Animate to discard pile
+            animateCardToDiscardPile(cardViewCopy);
+            
+            // Update direction indicator
+            updateDirectionIndicator();
+            
+            // Update turn label
+            updateTurnLabel();
+            
+            // Check for game over
+            if (game.isGameEnded()) {
+                handleGameEnd(true);
+                return;
+            }
+            
+            // Update playable cards
+            updatePlayableCards();
+            
+            // Handle AI turns
+            handleAITurns();
+        }
+    }
+    
+    /**
+     * Handles AI turns when it's an AI player's turn
+     */
+    private void handleAITurns() {
+        if (!isGameRunning || game == null) {
+            return;
+        }
+        
+        // Debug information
+        System.out.println("Checking for AI turns, current player index: " + game.getCurrentPlayerIndex());
+        
+        // If it's AI's turn, trigger AI move with a small delay
+        int currentPlayerIndex = game.getCurrentPlayerIndex();
+        if (currentPlayerIndex > 0) { // Player at index 0 is always human
+            // Create a delay so AI doesn't play immediately
+            javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(Duration.millis(1000));
+            pause.setOnFinished(e -> {
+                int aiIndex = currentPlayerIndex;
+                // Make sure it's still the same AI's turn after the delay
+                if (game.getCurrentPlayerIndex() == aiIndex) {
+                    System.out.println("AI player " + aiIndex + " is taking their turn");
+                    simpleAITurn(aiIndex);
+                }
+            });
+            pause.play();
+        }
+    }
+    
+    /**
+     * Simulates a simple AI turn.
+     *
+     * @param aiIndex The index of the AI player in the game's player list
+     */
+    private void simpleAITurn(int aiIndex) {
+        Player aiPlayer = game.getPlayers().get(aiIndex);
+        
+        // Make sure it's this AI's turn
+        if (!game.getCurrentPlayer().equals(aiPlayer)) {
+            System.out.println("Not AI player's turn anymore, skipping AI move");
+            return;
+        }
+        
+        System.out.println("AI player " + aiPlayer.getName() + " is checking for playable cards");
+        
+        // Update which cards are playable
+        game.updatePlayableCards();
+        
+        // Find a playable card
+        Card cardToPlay = null;
+        for (Card card : aiPlayer.getHand()) {
+            if (card.isPlayable()) {
+                cardToPlay = card;
+                System.out.println("AI will play: " + card);
+                break;
+            }
+        }
+        
+        // Play the card or draw if no playable card
+        if (cardToPlay != null) {
+            // Get the corresponding AI instance
+            ComputerAIPlayer aiInstance = aiPlayers.get(aiIndex - 1);
+            
+            final Card finalCardToPlay = cardToPlay; // Need final var for lambda
+            
+            // Handle wild card color selection
+            if (cardToPlay.isWildCard()) {
+                // Select a color
+                CardColor selectedColor = aiInstance.selectWildCardColor();
+                
+                // Set the color in the game
+                game.setCurrentColor(selectedColor);
+                
+                // Show notification about the selected color
+                showAIColorSelectionNotification(aiPlayer.getName(), selectedColor);
+                
+                // Small delay before playing the card
+                javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(Duration.millis(500));
+                pause.setOnFinished(e -> {
+                    playAICard(aiIndex, finalCardToPlay);
+                });
+                pause.play();
+            } else {
+                // Play non-wild card directly after a short delay
+                javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(Duration.millis(500));
+                pause.setOnFinished(e -> {
+                    playAICard(aiIndex, finalCardToPlay);
+                });
+                pause.play();
+            }
+        } else {
+            System.out.println("AI has no playable cards, will draw a card");
+            
+            // Delay before drawing
+            javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(Duration.millis(500));
+            pause.setOnFinished(e -> {
+                // Draw a card
+                Card drawnCard = game.drawCardForCurrentPlayer();
+                System.out.println("AI drew: " + (drawnCard != null ? drawnCard.toString() : "null"));
+                
+                // Update the UI
+                updateUI();
+                updateTurnLabel();
+                
+                // If it's now the human player's turn, update playable cards
+                if (!game.getCurrentPlayer().isAI()) {
+                    updatePlayableCards();
+                    
+                    // Pulse the human player's area since it's their turn
+                    updatePlayerAreaAnimations();
+                } else {
+                    // Otherwise, handle the next AI turn
+                    handleAITurns();
+                }
+            });
+            pause.play();
+        }
+    }
+    
+    /**
+     * Plays a card for an AI player.
+     * 
+     * @param aiIndex The index of the AI player
+     * @param card The card to play
+     */
+    private void playAICard(int aiIndex, Card card) {
+        Player aiPlayer = game.getPlayers().get(aiIndex);
+        
+        // Make sure it's still this AI's turn
+        if (!game.getCurrentPlayer().equals(aiPlayer)) {
+            System.out.println("Not AI player's turn anymore, skipping card play");
+            return;
+        }
+        
+        // Play the card
+        boolean success = game.playCard(card);
+        System.out.println("AI played card: " + card + ", success: " + success);
+        
+        if (success) {
+            // Update the UI
+            updateUI();
+            updateDirectionIndicator();
+            updateTurnLabel();
+            
+            // Check for game over
+            if (game.isGameEnded()) {
+                handleGameEnd(false);
+                return;
+            }
+            
+            // If there are more AI turns, handle them
+            if (game.getCurrentPlayer().isAI()) {
+                handleAITurns();
+            } else {
+                // Otherwise, update which cards are playable for the human player
+                updatePlayableCards();
+                
+                // Pulse the human player's area since it's their turn
+                updatePlayerAreaAnimations();
+            }
+        } else {
+            System.out.println("AI failed to play card: " + card);
+            
+            // If play failed (which shouldn't happen), try drawing instead
+            Card drawnCard = game.drawCardForCurrentPlayer();
+            updateUI();
+            updateTurnLabel();
+            
+            // Continue game flow
+            if (game.getCurrentPlayer().isAI()) {
+                handleAITurns();
+            } else {
+                updatePlayableCards();
+                updatePlayerAreaAnimations();
+            }
+        }
+    }
+    
+    /**
+     * Updates the direction indicator based on the game's direction
+     */
+    private void updateDirectionIndicator() {
+        boolean isClockwise = game.getDirection() == Direction.CLOCKWISE;
+        String imagePath = isClockwise 
+            ? "/images/arrow-clockwise.png" 
+            : "/images/arrow-counterclockwise.png";
+        
+        Image directionImage = new Image(getClass().getResourceAsStream(imagePath));
+        directionIndicator.setImage(directionImage);
+    }
+    
+    /**
+     * Updates the current turn label based on the active player
+     */
+    private void updateTurnLabel() {
+        if (game == null) {
+            return;
+        }
+        
+        Player currentPlayer = game.getCurrentPlayer();
+        if (currentPlayer == null) {
+            return;
+        }
+        
+        // Current player is the human player (always at index 0)
+        if (game.getCurrentPlayerIndex() == 0) {
+            currentTurnLabel.setText("YOUR TURN");
+            currentTurnLabel.setStyle("-fx-background-color: rgba(0, 153, 51, 0.8);"); // Green for player's turn
+        } else {
+            currentTurnLabel.setText(currentPlayer.getName() + "'S TURN");
+            currentTurnLabel.setStyle("-fx-background-color: rgba(217, 83, 79, 0.8);"); // Red for opponent's turn
+        }
+        
+        // Update which player area is pulsing
+        updatePlayerAreaAnimations();
+    }
+    
+    /**
+     * Updates the discard pile with the most recently played card.
      */
     private void setupDiscardPile() {
+        // Clear the discard pile
         discardPileContainer.getChildren().clear();
         
-        // Get the top card from the discard pile
         Card topCard = game.getDiscardPile().peekCard();
         
-        if (topCard != null) {
-            // Create card view for top card
-            StackPane cardView = CardRenderer.createCardView(topCard);
+        if (topCard == null) {
+            // If there's no card yet, show empty placeholder
+            discardPileContainer.getChildren().add(CardRenderer.createEmptyCardPlaceholder());
+        } else {
+            // Create a view for the top card
+            StackPane cardView;
             
-            // Add a slight rotation for visual interest
-            cardView.setRotate(-5 + (Math.random() * 10)); // Random rotation between -5 and 5 degrees
+            // For wild cards, use the special card renderer with color indicator
+            if (topCard.isWildCard() && game.getCurrentColor() != null && game.getCurrentColor() != CardColor.MULTI) {
+                if (topCard.getAction() == CardAction.WILD) {
+                    cardView = CardRenderer.createWildCardWithSelectedColor(topCard, game.getCurrentColor());
+                } else {
+                    cardView = CardRenderer.createWildDrawFourWithSelectedColor(topCard, game.getCurrentColor());
+                }
+                
+                // Add a slight rotation for visual interest
+                cardView.setRotate(-5 + (Math.random() * 10));
+            } else {
+                // Regular cards
+                cardView = CardRenderer.createCardView(topCard);
+                
+                // Add a slight rotation for visual interest
+                cardView.setRotate(-5 + (Math.random() * 10));
+            }
             
             // Add shadow for emphasis
             javafx.scene.effect.DropShadow shadow = new javafx.scene.effect.DropShadow();
@@ -425,19 +804,9 @@ public class GameController {
             cardView.setEffect(shadow);
             
             discardPileContainer.getChildren().add(cardView);
-            
-            // Log the top card for debugging
-            System.out.println("Current discard top card: " + topCard);
-        } else {
-            // Create an empty placeholder if there's no card
-            StackPane emptyPlaceholder = CardRenderer.createEmptyCardPlaceholder();
-            discardPileContainer.getChildren().add(emptyPlaceholder);
-            
-            // Log empty discard pile for debugging
-            System.out.println("Discard pile is empty");
         }
         
-        // Add discard pile label
+        // Add a label to show what pile this is
         Label pileLabel = new Label("DISCARD PILE");
         pileLabel.getStyleClass().add("card-pile-label");
         discardPileContainer.getChildren().add(pileLabel);
@@ -516,159 +885,6 @@ public class GameController {
      */
     private StackPane createCardView(Card card) {
         return CardRenderer.createCardView(card);
-    }
-    
-    /**
-     * Handles playing a card from the player's hand
-     *
-     * @param cardView The card view in the UI
-     * @param card The card model being played
-     */
-    private void playCard(StackPane cardView, Card card) {
-        // Only allow playing cards on the player's turn
-        if (game.getCurrentPlayerIndex() != 0 || !isGameRunning) {
-            return;
-        }
-        
-        // Try to play the card
-        boolean playSuccessful = game.playCard(card);
-        
-        if (playSuccessful) {
-            // Set the first card played flag
-            firstCardPlayed = true;
-            
-            // Check if the game has ended
-            if (game.isGameEnded()) {
-                handleGameEnd(true); // Human player won
-                return;
-            }
-            
-            // Update the UI to show the new state
-            updateUI();
-            
-            // Update direction indicator
-            updateDirectionIndicator();
-            
-            // Update turn label
-            updateTurnLabel();
-            
-            // Update player area animations
-            updatePlayerAreaAnimations();
-            
-            // Check if it's AI's turn and handle it
-            handleAITurns();
-        }
-    }
-    
-    /**
-     * Handles AI turns when it's an AI player's turn
-     */
-    private void handleAITurns() {
-        if (!isGameRunning || game == null) {
-            return;
-        }
-        
-        // If it's AI's turn, trigger AI move
-        int currentPlayerIndex = game.getCurrentPlayerIndex();
-        if (currentPlayerIndex > 0) { // Player at index 0 is always human
-            simpleAITurn(currentPlayerIndex - 1); // -1 because AI index in aiPlayers starts from 0
-        }
-    }
-    
-    /**
-     * Updates the direction indicator based on the game's direction
-     */
-    private void updateDirectionIndicator() {
-        boolean isClockwise = game.getDirection() == Direction.CLOCKWISE;
-        String imagePath = isClockwise 
-            ? "/images/arrow-clockwise.png" 
-            : "/images/arrow-counterclockwise.png";
-        
-        Image directionImage = new Image(getClass().getResourceAsStream(imagePath));
-        directionIndicator.setImage(directionImage);
-    }
-    
-    /**
-     * Updates the current turn label based on the active player
-     */
-    private void updateTurnLabel() {
-        if (game == null) {
-            return;
-        }
-        
-        Player currentPlayer = game.getCurrentPlayer();
-        if (currentPlayer == null) {
-            return;
-        }
-        
-        // Current player is the human player (always at index 0)
-        if (game.getCurrentPlayerIndex() == 0) {
-            currentTurnLabel.setText("YOUR TURN");
-            currentTurnLabel.setStyle("-fx-background-color: rgba(0, 153, 51, 0.8);"); // Green for player's turn
-        } else {
-            currentTurnLabel.setText(currentPlayer.getName() + "'S TURN");
-            currentTurnLabel.setStyle("-fx-background-color: rgba(217, 83, 79, 0.8);"); // Red for opponent's turn
-        }
-        
-        // Update which player area is pulsing
-        updatePlayerAreaAnimations();
-    }
-    
-    /**
-     * Performs a simple AI turn for the specified AI player
-     * 
-     * @param aiIndex The index of the AI player in the aiPlayers list
-     */
-    private void simpleAITurn(int aiIndex) {
-        if (!isGameRunning || game == null) {
-            return;
-        }
-        
-        // Wait a moment before AI plays (for better user experience)
-        javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(1));
-        pause.setOnFinished(event -> {
-            // Find the first playable card in the AI's hand
-            boolean cardPlayed = false;
-            Player aiPlayer = game.getCurrentPlayer();
-            
-            if (aiPlayer != null && aiPlayer.isAI()) {
-                for (Card card : aiPlayer.getHand()) {
-                    if (card.isPlayable()) {
-                        game.playCard(card);
-                        cardPlayed = true;
-                        break;
-                    }
-                }
-                
-                // If no card can be played, draw a card
-                if (!cardPlayed) {
-                    game.drawCardForCurrentPlayer();
-                }
-                
-                // Update UI
-                updateUI();
-                
-                // Update direction indicator
-                updateDirectionIndicator();
-                
-                // Update turn label
-                updateTurnLabel();
-                
-                // Update player area animations
-                updatePlayerAreaAnimations();
-                
-                // If the AI turn resulted in game end
-                if (game.isGameEnded()) {
-                    handleGameEnd(false); // AI player won
-                    return;
-                }
-                
-                // If the next player is also AI, continue the chain
-                handleAITurns();
-            }
-        });
-        
-        pause.play();
     }
     
     /**
@@ -855,6 +1071,28 @@ public class GameController {
     }
     
     /**
+     * Shows a notification about an AI player's color selection.
+     * 
+     * @param playerName The AI player's name
+     * @param selectedColor The selected color
+     */
+    private void showAIColorSelectionNotification(String playerName, CardColor selectedColor) {
+        // Create the notification
+        ColorNotification notification = new ColorNotification(playerName, selectedColor);
+        
+        // Add the notification to the game pane
+        StackPane notificationPane = notification.getNotificationPane();
+        gamePane.getChildren().add(notificationPane);
+        
+        // Position the notification at the top center of the game pane
+        notificationPane.setLayoutX((gamePane.getWidth() - notificationPane.getMaxWidth()) / 2);
+        notificationPane.setLayoutY(50);
+        
+        // Show the notification
+        notification.show();
+    }
+    
+    /**
      * Navigates back to the main menu.
      */
     private void navigateToMainMenu() {
@@ -988,5 +1226,41 @@ public class GameController {
         leftPlayerNameLabel.toFront();
         rightPlayerNameLabel.toFront();
         bottomPlayerNameLabel.toFront();
+    }
+    
+    /**
+     * Animates a card moving to the discard pile.
+     * 
+     * @param cardView The card view to animate
+     */
+    private void animateCardToDiscardPile(StackPane cardView) {
+        // Calculate the target position (discard pile's center)
+        double targetX = discardPileContainer.localToScene(discardPileContainer.getBoundsInLocal()).getCenterX() - 
+                        gamePane.localToScene(gamePane.getBoundsInLocal()).getMinX() - 40; // Half of card width
+        double targetY = discardPileContainer.localToScene(discardPileContainer.getBoundsInLocal()).getCenterY() - 
+                        gamePane.localToScene(gamePane.getBoundsInLocal()).getMinY() - 60; // Half of card height
+        
+        // Create the animations
+        javafx.animation.TranslateTransition moveCard = new javafx.animation.TranslateTransition(Duration.millis(300), cardView);
+        moveCard.setToX(targetX - cardView.getLayoutX());
+        moveCard.setToY(targetY - cardView.getLayoutY());
+        
+        javafx.animation.RotateTransition rotateCard = new javafx.animation.RotateTransition(Duration.millis(300), cardView);
+        rotateCard.setToAngle(-5 + (Math.random() * 10)); // Random angle for natural look
+        
+        // Play both animations in parallel
+        javafx.animation.ParallelTransition animation = new javafx.animation.ParallelTransition(moveCard, rotateCard);
+        
+        // When animation completes, update the UI
+        animation.setOnFinished(e -> {
+            // Remove the animated card
+            gamePane.getChildren().remove(cardView);
+            
+            // Update the discard pile
+            setupDiscardPile();
+        });
+        
+        // Start the animation
+        animation.play();
     }
 } 

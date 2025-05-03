@@ -461,4 +461,100 @@ public class CardRenderer {
                 return Color.BLACK;
         }
     }
+
+    /**
+     * Creates a visual representation of a wild card with a selected color.
+     *
+     * @param card The card model to display
+     * @param selectedColor The color selected for the wild card
+     * @return A StackPane containing the card visualization
+     */
+    public static StackPane createWildCardWithSelectedColor(Card card, CardColor selectedColor) {
+        StackPane cardView = createWildCardView(card);
+        
+        // Create color indicator
+        Rectangle colorIndicator = new Rectangle(30, 30);
+        colorIndicator.setArcWidth(15);
+        colorIndicator.setArcHeight(15);
+        
+        // Set color based on selection
+        switch (selectedColor) {
+            case RED:
+                colorIndicator.setFill(Color.rgb(227, 35, 45));
+                break;
+            case BLUE:
+                colorIndicator.setFill(Color.rgb(0, 122, 193));
+                break;
+            case GREEN:
+                colorIndicator.setFill(Color.rgb(67, 176, 71));
+                break;
+            case YELLOW:
+                colorIndicator.setFill(Color.rgb(243, 206, 37));
+                break;
+            default:
+                // Should never happen for a wild card with selected color
+                colorIndicator.setFill(Color.WHITE);
+                break;
+        }
+        
+        // Add a white border
+        colorIndicator.setStroke(Color.WHITE);
+        colorIndicator.setStrokeWidth(2);
+        
+        // Position at bottom of card
+        colorIndicator.setTranslateY(35);
+        
+        // Add to the card view
+        cardView.getChildren().add(colorIndicator);
+        
+        return cardView;
+    }
+
+    /**
+     * Creates a visual representation of a wild draw four card with a selected color.
+     *
+     * @param card The card model to display
+     * @param selectedColor The color selected for the wild card
+     * @return A StackPane containing the card visualization
+     */
+    public static StackPane createWildDrawFourWithSelectedColor(Card card, CardColor selectedColor) {
+        StackPane cardView = createWildDrawFourCardView(card);
+        
+        // Create color indicator
+        Rectangle colorIndicator = new Rectangle(30, 30);
+        colorIndicator.setArcWidth(15);
+        colorIndicator.setArcHeight(15);
+        
+        // Set color based on selection
+        switch (selectedColor) {
+            case RED:
+                colorIndicator.setFill(Color.rgb(227, 35, 45));
+                break;
+            case BLUE:
+                colorIndicator.setFill(Color.rgb(0, 122, 193));
+                break;
+            case GREEN:
+                colorIndicator.setFill(Color.rgb(67, 176, 71));
+                break;
+            case YELLOW:
+                colorIndicator.setFill(Color.rgb(243, 206, 37));
+                break;
+            default:
+                // Should never happen for a wild card with selected color
+                colorIndicator.setFill(Color.WHITE);
+                break;
+        }
+        
+        // Add a white border
+        colorIndicator.setStroke(Color.WHITE);
+        colorIndicator.setStrokeWidth(2);
+        
+        // Position at bottom of card
+        colorIndicator.setTranslateY(35);
+        
+        // Add to the card view
+        cardView.getChildren().add(colorIndicator);
+        
+        return cardView;
+    }
 } 

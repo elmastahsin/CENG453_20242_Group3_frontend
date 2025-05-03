@@ -23,6 +23,9 @@ public class Game {
     private boolean gameEnded;
     private Player winner;
     private final Random random;
+    
+    // Track the current color for wild cards
+    private CardColor currentColor;
 
     /**
      * Constructor for creating a new game.
@@ -43,6 +46,7 @@ public class Game {
         this.gameEnded = false;
         this.winner = null;
         this.random = new Random();
+        this.currentColor = null; // Will be set when first card is played
     }
 
     /**
@@ -100,6 +104,15 @@ public class Game {
     }
 
     /**
+     * Checks if the discard pile is empty.
+     *
+     * @return true if the discard pile is empty, false otherwise
+     */
+    public boolean isDiscardPileEmpty() {
+        return discardPile == null || discardPile.isEmpty();
+    }
+
+    /**
      * Gets the current direction of play.
      *
      * @return The direction
@@ -115,6 +128,27 @@ public class Game {
      */
     public void setDirection(Direction direction) {
         this.direction = direction;
+    }
+
+    /**
+     * Gets the current game color (important for wild cards).
+     *
+     * @return The current game color
+     */
+    public CardColor getCurrentColor() {
+        return currentColor;
+    }
+
+    /**
+     * Sets the current game color (used after playing wild cards).
+     *
+     * @param color The new game color
+     */
+    public void setCurrentColor(CardColor color) {
+        if (color != CardColor.MULTI) {
+            this.currentColor = color;
+            System.out.println("Game color changed to: " + color);
+        }
     }
 
     /**
@@ -151,11 +185,55 @@ public class Game {
         Card topCard = discardPile.peekCard();
         
         if (topCard == null) {
+            // If no cards in discard pile yet, all cards are playable
+            for (Card card : currentPlayer.getHand()) {
+                card.setPlayable(true);
+            }
             return;
         }
         
+        System.out.println("Updating playable cards for " + currentPlayer.getName());
+        System.out.println("Top card: " + topCard + ", Current color: " + currentColor);
+        
+        boolean hasMatchingColorCard = false;
+        
+        // First check if the player has any cards matching the current color
+        // This is needed for Wild Draw Four validation
         for (Card card : currentPlayer.getHand()) {
-            card.setPlayable(card.canPlayOn(topCard));
+            if (card.getColor() == currentColor && card.getColor() != CardColor.MULTI) {
+                hasMatchingColorCard = true;
+                break;
+            }
+        }
+        
+        // Then determine which cards are playable
+        for (Card card : currentPlayer.getHand()) {
+            boolean playable = false;
+            
+            if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
+                // Wild Draw Four can only be played if the player has no cards matching the current color
+                playable = !hasMatchingColorCard;
+            } else if (card.isWildCard()) {
+                // Regular wild cards can always be played
+                playable = true;
+            } else if (card.getColor() == currentColor) {
+                // Cards matching the current color can be played
+                playable = true;
+            } else if (topCard.isNumberCard() && card.isNumberCard() && topCard.getValue() == card.getValue()) {
+                // Number cards matching the top card's value can be played
+                playable = true;
+            } else if (topCard.isActionCard() && card.isActionCard() && topCard.getAction() == card.getAction() 
+                      && !card.isWildCard() && !topCard.isWildCard()) {
+                // Action cards matching the top card's action can be played (except wilds)
+                playable = true;
+            }
+            
+            card.setPlayable(playable);
+            
+            // Debug output
+            if (playable) {
+                System.out.println("Playable card: " + card);
+            }
         }
     }
 
@@ -237,9 +315,10 @@ public class Game {
     public Card startFirstTurn() {
         // Move one card from draw pile to discard pile to start the game
         Card initialCard = drawPile.drawCard();
-        // Keep drawing until we get a number card (not an action card)
-        while (initialCard != null && !initialCard.isNumberCard()) {
-            // Put the action card back in the deck and shuffle
+        // Keep drawing until we get a valid starting card (not a Wild+4 or action card)
+        while (initialCard != null && (initialCard.getAction() == CardAction.WILD_DRAW_FOUR || 
+                                      initialCard.isActionCard())) {
+            // Put the card back in the deck and shuffle
             drawPile.addCard(initialCard);
             drawPile.shuffle();
             initialCard = drawPile.drawCard();
@@ -249,7 +328,12 @@ public class Game {
             // Create a fresh discard pile to ensure proper ordering
             discardPile = new Deck();
             discardPile.addCard(initialCard);
+            
+            // Set the initial color based on the first card
+            currentColor = initialCard.getColor();
+            
             System.out.println("Initial card placed on discard pile: " + initialCard);
+            System.out.println("Initial game color: " + currentColor);
         }
         
         return initialCard;
@@ -325,9 +409,8 @@ public class Game {
             return false;
         }
 
-        // Check if the card can be played
-        Card topCard = discardPile.peekCard();
-        if (topCard != null && !card.canPlayOn(topCard)) {
+        // Make sure the card is playable according to UNO rules
+        if (!isCardPlayable(card)) {
             return false;
         }
 
@@ -338,6 +421,23 @@ public class Game {
 
         // Add the card to the discard pile
         discardPile.addCard(card);
+        
+        // If it's a wild card, the color should already be set by the UI
+        // But for AI players, we select a random color if it hasn't been set yet
+        if (card.isWildCard() && currentPlayer.isAI()) {
+            // For AI players, choose a random color if not already set
+            CardColor[] possibleColors = {
+                CardColor.RED, CardColor.BLUE, CardColor.GREEN, CardColor.YELLOW
+            };
+            
+            // If color hasn't been set yet, set it now
+            if (this.currentColor == null || this.currentColor == CardColor.MULTI) {
+                setCurrentColor(possibleColors[random.nextInt(possibleColors.length)]);
+            }
+        } else if (!card.isWildCard()) {
+            // For regular cards, set the current color to the card's color
+            setCurrentColor(card.getColor());
+        }
 
         // Check if the player has won
         if (currentPlayer.getCardCount() == 0) {
@@ -354,6 +454,57 @@ public class Game {
 
         return true;
     }
+    
+    /**
+     * Checks if a card is playable according to UNO rules.
+     *
+     * @param card The card to check
+     * @return true if the card can be played, false otherwise
+     */
+    private boolean isCardPlayable(Card card) {
+        Card topCard = discardPile.peekCard();
+        
+        // If this is the first card (no cards in discard pile), any card can be played
+        if (topCard == null || discardPile.isEmpty()) {
+            System.out.println("Discard pile is empty, any card can be played");
+            return true;
+        }
+        
+        // Wild cards can always be played except for Wild Draw Four
+        if (card.getAction() == CardAction.WILD) {
+            return true;
+        }
+        
+        // Wild Draw Four can only be played if the player has no cards matching the current color
+        if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
+            Player currentPlayer = getCurrentPlayer();
+            for (Card playerCard : currentPlayer.getHand()) {
+                if (playerCard != card && playerCard.getColor() == currentColor) {
+                    return false; // Player has a card matching the current color
+                }
+            }
+            return true;
+        }
+        
+        // Cards of the same color as the current game color can be played
+        if (card.getColor() == currentColor) {
+            return true;
+        }
+        
+        // Cards with the same number as the top card can be played
+        if (topCard.isNumberCard() && card.isNumberCard() && topCard.getValue() == card.getValue()) {
+            return true;
+        }
+        
+        // Action cards with the same action can be played (except wild cards)
+        if (topCard.isActionCard() && card.isActionCard() && 
+            topCard.getAction() == card.getAction() && 
+            !topCard.isWildCard() && !card.isWildCard()) {
+            return true;
+        }
+        
+        return false;
+    }
 
     /**
      * Handles the effects of special cards.
@@ -361,7 +512,7 @@ public class Game {
      * @param card The card that was played
      */
     private void handleSpecialCard(Card card) {
-        // If it's a number card or a standard wild card, just move to the next player
+        // If it's a number card or a wild card without draw, just move to the next player
         if (card.isNumberCard() || card.getAction() == CardAction.WILD) {
             nextPlayer();
             return;
@@ -453,6 +604,12 @@ public class Game {
         if (card != null) {
             currentPlayer.addCard(card);
             
+            // For AI players, automatically play the card if possible
+            if (currentPlayer.isAI() && isCardPlayable(card)) {
+                playCard(card);
+                return card;
+            }
+            
             // After drawing, move to the next player
             nextPlayer();
             
@@ -462,7 +619,10 @@ public class Game {
         
         return card;
     }
-
+    
+    /**
+     * Gets the current UNO state as a string for debugging purposes.
+     */
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -470,6 +630,7 @@ public class Game {
         sb.append("Game Mode: ").append(gameMode).append("\n");
         sb.append("Player Count: ").append(playerCount.getCount()).append("\n");
         sb.append("Direction: ").append(direction).append("\n");
+        sb.append("Current Color: ").append(currentColor).append("\n");
         sb.append("Current Player: ").append(getCurrentPlayer() != null ? getCurrentPlayer().getName() : "None").append("\n");
         sb.append("Draw Pile: ").append(drawPile.getSize()).append(" cards\n");
         sb.append("Discard Pile: ").append(discardPile.getSize()).append(" cards\n");
