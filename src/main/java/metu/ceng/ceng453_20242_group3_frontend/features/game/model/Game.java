@@ -307,39 +307,6 @@ public class Game {
     }
 
     /**
-     * Places the first card from the draw pile onto the discard pile to start the game.
-     * This should be called after the game has started and players are ready to play.
-     * 
-     * @return The card placed on the discard pile
-     */
-    public Card startFirstTurn() {
-        // Move one card from draw pile to discard pile to start the game
-        Card initialCard = drawPile.drawCard();
-        // Keep drawing until we get a valid starting card (not a Wild+4 or action card)
-        while (initialCard != null && (initialCard.getAction() == CardAction.WILD_DRAW_FOUR || 
-                                      initialCard.isActionCard())) {
-            // Put the card back in the deck and shuffle
-            drawPile.addCard(initialCard);
-            drawPile.shuffle();
-            initialCard = drawPile.drawCard();
-        }
-        
-        if (initialCard != null) {
-            // Create a fresh discard pile to ensure proper ordering
-            discardPile = new Deck();
-            discardPile.addCard(initialCard);
-            
-            // Set the initial color based on the first card
-            currentColor = initialCard.getColor();
-            
-            System.out.println("Initial card placed on discard pile: " + initialCard);
-            System.out.println("Initial game color: " + currentColor);
-        }
-        
-        return initialCard;
-    }
-
-    /**
      * Deals initial cards to all players.
      */
     private void dealInitialCards() {
@@ -445,6 +412,11 @@ public class Game {
             winner = currentPlayer;
             return true;
         }
+        
+        // Automatically call UNO when player has one card left
+        if (currentPlayer.getCardCount() == 1) {
+            currentPlayer.setHasCalledUno(true);
+        }
 
         // Handle special cards
         handleSpecialCard(card);
@@ -521,15 +493,21 @@ public class Game {
         // Handle action cards
         switch (card.getAction()) {
             case SKIP:
+                // Skip next player's turn
                 skipPlayer();
                 break;
                 
             case REVERSE:
+                // Reverse the direction of play
                 reverseDirection();
+                
                 // In a two-player game, Reverse acts like Skip
                 if (players.size() == 2) {
+                    // After reversing, we need to do a nextPlayer to skip the other player
                     nextPlayer();
                 } else {
+                    // In games with more than 2 players, just move to the next player
+                    // (which will be different due to reversed direction)
                     nextPlayer();
                 }
                 break;
@@ -646,5 +624,26 @@ public class Game {
         }
         
         return sb.toString();
+    }
+
+    /**
+     * Gets the player who would be next in turn.
+     * Useful for determining who is affected by action cards.
+     *
+     * @return The next player in turn sequence
+     */
+    public Player getNextPlayer() {
+        if (players.isEmpty()) {
+            return null;
+        }
+        
+        int nextPlayerIndex;
+        if (direction == Direction.CLOCKWISE) {
+            nextPlayerIndex = (currentPlayerIndex + 1) % players.size();
+        } else {
+            nextPlayerIndex = (currentPlayerIndex - 1 + players.size()) % players.size();
+        }
+        
+        return players.get(nextPlayerIndex);
     }
 } 

@@ -10,6 +10,7 @@ public class Player {
     private final String name;
     private final List<Card> hand;
     private boolean isAI;
+    private boolean hasCalledUno;
 
     /**
      * Constructor for creating a player.
@@ -21,6 +22,7 @@ public class Player {
         this.name = name;
         this.hand = new ArrayList<>();
         this.isAI = isAI;
+        this.hasCalledUno = false;
     }
 
     /**
@@ -43,6 +45,14 @@ public class Player {
     public boolean isAI() {
         return isAI;
     }
+    
+    public boolean hasCalledUno() {
+        return hasCalledUno;
+    }
+    
+    public void setHasCalledUno(boolean hasCalledUno) {
+        this.hasCalledUno = hasCalledUno;
+    }
 
     /**
      * Adds a card to the player's hand.
@@ -51,6 +61,11 @@ public class Player {
      */
     public void addCard(Card card) {
         hand.add(card);
+        
+        // Reset UNO declaration if player has more than 1 card
+        if (hand.size() > 1) {
+            hasCalledUno = false;
+        }
     }
 
     /**
@@ -60,7 +75,14 @@ public class Player {
      * @return true if the card was removed, false otherwise
      */
     public boolean removeCard(Card card) {
-        return hand.remove(card);
+        boolean removed = hand.remove(card);
+        
+        // Reset UNO declaration if player has more than 1 card
+        if (hand.size() > 1) {
+            hasCalledUno = false;
+        }
+        
+        return removed;
     }
 
     /**
@@ -70,6 +92,15 @@ public class Player {
      */
     public int getCardCount() {
         return hand.size();
+    }
+    
+    /**
+     * Checks if the player should declare UNO (has exactly 1 card).
+     *
+     * @return true if the player should declare UNO, false otherwise
+     */
+    public boolean shouldDeclareUno() {
+        return hand.size() == 1 && !hasCalledUno;
     }
 
     /**

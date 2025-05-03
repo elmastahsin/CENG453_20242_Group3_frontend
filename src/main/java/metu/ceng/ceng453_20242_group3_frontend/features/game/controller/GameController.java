@@ -12,6 +12,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.AnchorPane;
@@ -20,9 +21,22 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import javafx.animation.PauseTransition;
+import javafx.animation.ScaleTransition;
+import javafx.application.Platform;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.geometry.Bounds;
+import javafx.geometry.Point2D;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.layout.Pane;
 
 import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Card;
@@ -39,6 +53,7 @@ import metu.ceng.ceng453_20242_group3_frontend.features.common.util.SessionManag
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.CardRenderer;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ColorSelectionDialog;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ColorNotification;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ActionNotification;
 
 /**
  * Controller for the game view.
@@ -190,17 +205,17 @@ public class GameController {
             }
         }
         
-        // Update the UI
+        // Set up the game table
+        setupGameTableAnimations();
+
+        // Update the UI with initial game state
         updateUI();
         
-        // Update direction indicator
-        updateDirectionIndicator();
+        // Add the test button for UNO indicators
+        addTestButton();
         
-        // Update turn label
-        updateTurnLabel();
-        
-        // Update player area animations
-        updatePlayerAreaAnimations();
+        // Update UNO indicators based on card counts
+        updateUnoIndicators();
     }
     
     /**
@@ -250,6 +265,11 @@ public class GameController {
         
         // Always set up discard pile - will show empty placeholder if no card has been played
         setupDiscardPile();
+        
+        // Update UNO indicators for all players
+        updateUnoIndicators();
+
+        updateTurnLabel();
     }
     
     /**
@@ -290,12 +310,7 @@ public class GameController {
         
         // Add click event to draw a card
         cardBackView.setOnMouseClicked(event -> {
-            // First click after game start should place initial card on discard pile
-            if (!firstCardPlayed) {
-                startFirstCardPlay();
-            } else {
-                drawCard();
-            }
+            drawCard();
         });
         
         drawPileContainer.getChildren().add(cardBackView);
@@ -304,73 +319,6 @@ public class GameController {
         Label pileLabel = new Label("DRAW PILE");
         pileLabel.getStyleClass().add("card-pile-label");
         drawPileContainer.getChildren().add(pileLabel);
-    }
-    
-    /**
-     * Places the first card in the discard pile to start the game
-     */
-    private void startFirstCardPlay() {
-        Card initialCard = game.startFirstTurn();
-        
-        if (initialCard != null) {
-            firstCardPlayed = true;
-            
-            // Create and animate the initial card being placed
-            StackPane cardView = CardRenderer.createCardView(initialCard);
-            cardView.setScaleX(0.1);
-            cardView.setScaleY(0.1);
-            cardView.setOpacity(0);
-            
-            // Clear and add to the discard pile container
-            discardPileContainer.getChildren().clear();
-            discardPileContainer.getChildren().add(cardView);
-            
-            // Add discard pile label
-            Label pileLabel = new Label("DISCARD PILE");
-            pileLabel.getStyleClass().add("card-pile-label");
-            discardPileContainer.getChildren().add(pileLabel);
-            
-            // Animate the card appearing
-            javafx.animation.ScaleTransition scaleX = new javafx.animation.ScaleTransition(Duration.millis(500), cardView);
-            scaleX.setToX(1.0);
-            
-            javafx.animation.ScaleTransition scaleY = new javafx.animation.ScaleTransition(Duration.millis(500), cardView);
-            scaleY.setToY(1.0);
-            
-            javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(Duration.millis(500), cardView);
-            fade.setToValue(1.0);
-            
-            javafx.animation.ParallelTransition animation = new javafx.animation.ParallelTransition(scaleX, scaleY, fade);
-            animation.setOnFinished(e -> {
-                // Add rotation after animation completes
-                cardView.setRotate(-5 + (Math.random() * 10));
-                
-                // Set the current color based on the card
-                if (initialCard.getColor() != CardColor.MULTI) {
-                    game.setCurrentColor(initialCard.getColor());
-                }
-                
-                // Update playable cards
-                updatePlayableCards();
-                
-                // Update the current turn indicator
-                updateTurnLabel();
-                
-                // Update player animations
-                updatePlayerAreaAnimations();
-                
-                // Also play AI turn if needed
-                handleAITurns();
-            });
-            
-            animation.play();
-        } else {
-            // In case we couldn't get an initial card, still allow play to continue
-            firstCardPlayed = true;
-            updatePlayableCards();
-            updateTurnLabel();
-            updatePlayerAreaAnimations();
-        }
     }
     
     /**
@@ -503,6 +451,59 @@ public class GameController {
     }
     
     /**
+     * Displays a notification that the player has automatically declared UNO.
+     */
+    private void declareUno() {
+        Player player = game.getPlayers().get(0); // Human player
+        
+        // Automatically declare UNO for the player
+        player.setHasCalledUno(true);
+        
+        // Show UNO call notification
+        showUnoCallNotification(player.getName());
+    }
+    
+    /**
+     * Gets an action message based on the card type.
+     * 
+     * @param card The card that was played
+     * @param targetPlayerName The name of the player affected by the action
+     * @return A message describing the card's action or null if no notification should be shown
+     */
+    private String getActionMessage(Card card, String targetPlayerName) {
+        // ONLY show notifications for action cards, NOT for number cards
+        if (!card.isActionCard()) {
+            return null; // Return null to indicate no notification should be shown
+        }
+        
+        switch (card.getAction()) {
+            case SKIP:
+                return "plays " + card.getColor() + " Skip! " + targetPlayerName + "'s turn is skipped";
+                
+            case REVERSE:
+                if (game.getPlayers().size() == 2) {
+                    // In 2-player game, Reverse acts like Skip
+                    return "plays " + card.getColor() + " Reverse! " + targetPlayerName + "'s turn is skipped";
+                } else {
+                    return "plays " + card.getColor() + " Reverse! Direction is changed";
+                }
+                
+            case DRAW_TWO:
+                return "plays " + card.getColor() + " Draw Two! " + targetPlayerName + " draws 2 cards";
+                
+            case WILD:
+                // Color change notification is handled separately
+                return null;
+                
+            case WILD_DRAW_FOUR:
+                return "plays Wild Draw Four! " + targetPlayerName + " draws 4 cards, color is now " + game.getCurrentColor();
+                
+            default:
+                return null; // Return null for any other cards that don't need notifications
+        }
+    }
+    
+    /**
      * Completes playing a card after any required user input (like wild card color selection).
      * 
      * @param cardView The card view to animate
@@ -512,10 +513,40 @@ public class GameController {
         // Remove card from player's hand visually
         bottomPlayerCardsContainer.getChildren().remove(cardView);
         
+        Player currentPlayer = game.getCurrentPlayer();
+        int originalCardCount = currentPlayer.getCardCount();
+        
+        // Get the next player who will be affected by the action
+        Player nextPlayer = game.getNextPlayer();
+        String nextPlayerName = nextPlayer != null ? nextPlayer.getName() : "Unknown";
+        
         // First update the game model - this needs to happen before animation
         boolean success = game.playCard(card);
         
         if (success) {
+            // Show wild card color notification separately to ensure it's always displayed
+            if (card.isWildCard() && game.getCurrentColor() != CardColor.MULTI) {
+                showColorSelectionNotification(currentPlayer.getName(), game.getCurrentColor());
+            }
+            
+            // ONLY show notifications for special actions
+            String actionMessage = getActionMessage(card, nextPlayerName);
+            if (actionMessage != null) {
+                showActionNotification(currentPlayer.getName(), actionMessage);
+            }
+            
+            // Check for UNO declaration when player will have 1 card left
+            if (originalCardCount == 2 && currentPlayer.getCardCount() == 1) {
+                // For human players, automatically declare UNO
+                if (!currentPlayer.isAI()) {
+                    declareUno();
+                } else {
+                    // AI players also automatically declare UNO
+                    currentPlayer.setHasCalledUno(true);
+                    showUnoCallNotification(currentPlayer.getName());
+                }
+            }
+            
             // Now handle animation - but don't rely on the cardView which might be null after removal
             StackPane cardViewCopy = CardRenderer.createCardView(card);
             
@@ -545,6 +576,45 @@ public class GameController {
             // Handle AI turns
             handleAITurns();
         }
+    }
+    
+    /**
+     * Shows a notification about a player declaring UNO.
+     * 
+     * @param playerName The player's name
+     */
+    private void showUnoCallNotification(String playerName) {
+        ActionNotification notification = ActionNotification.createUnoCallNotification(playerName);
+        showNotification(notification);
+    }
+    
+    /**
+     * Shows a notification about a game action.
+     * 
+     * @param playerName The player's name
+     * @param actionMessage The action message
+     */
+    private void showActionNotification(String playerName, String actionMessage) {
+        ActionNotification notification = new ActionNotification(playerName, actionMessage);
+        showNotification(notification);
+    }
+    
+    /**
+     * Displays a notification in the game pane.
+     * 
+     * @param notification The notification to display
+     */
+    private void showNotification(ActionNotification notification) {
+        // Add the notification to the game pane
+        StackPane notificationPane = notification.getNotificationPane();
+        gamePane.getChildren().add(notificationPane);
+        
+        // Position the notification at the top center of the game pane
+        notificationPane.setLayoutX((gamePane.getWidth() - notificationPane.getMaxWidth()) / 2);
+        notificationPane.setLayoutY(50);
+        
+        // Show the notification
+        notification.show();
     }
     
     /**
@@ -619,9 +689,6 @@ public class GameController {
                 // Set the color in the game
                 game.setCurrentColor(selectedColor);
                 
-                // Show notification about the selected color
-                showAIColorSelectionNotification(aiPlayer.getName(), selectedColor);
-                
                 // Small delay before playing the card
                 javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(Duration.millis(500));
                 pause.setOnFinished(e -> {
@@ -680,11 +747,35 @@ public class GameController {
             return;
         }
         
+        int originalCardCount = aiPlayer.getCardCount();
+        
+        // Get the next player who will be affected by the action
+        Player nextPlayer = game.getNextPlayer();
+        String nextPlayerName = nextPlayer != null ? nextPlayer.getName() : "Unknown";
+        
         // Play the card
         boolean success = game.playCard(card);
         System.out.println("AI played card: " + card + ", success: " + success);
         
         if (success) {
+            // Show wild card color notification separately to ensure it's always displayed
+            if (card.isWildCard() && game.getCurrentColor() != CardColor.MULTI) {
+                showColorSelectionNotification(aiPlayer.getName(), game.getCurrentColor());
+            }
+            
+            // ONLY show notifications for special actions
+            String actionMessage = getActionMessage(card, nextPlayerName);
+            if (actionMessage != null) {
+                showActionNotification(aiPlayer.getName(), actionMessage);
+            }
+            
+            // Check for UNO declaration when player will have 1 card left
+            if (originalCardCount == 2 && aiPlayer.getCardCount() == 1) {
+                // AI automatically declares UNO
+                aiPlayer.setHasCalledUno(true);
+                showUnoCallNotification(aiPlayer.getName());
+            }
+            
             // Update the UI
             updateUI();
             updateDirectionIndicator();
@@ -915,23 +1006,26 @@ public class GameController {
     private void handleGameEnd(boolean isPlayerWinner) {
         isGameRunning = false;
         
-        // Create alert dialog
-        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-            javafx.scene.control.Alert.AlertType.INFORMATION
-        );
-        
-        alert.setTitle("Game Over");
-        
-        if (isPlayerWinner) {
-            alert.setHeaderText("You Win!");
-            alert.setContentText("Congratulations, you have won the game!");
-        } else {
-            alert.setHeaderText("You Lose!");
-            alert.setContentText("Better luck next time!");
-        }
-        
-        // Show dialog and return to main menu when closed
-        alert.showAndWait().ifPresent(response -> exitGame());
+        // Use Platform.runLater to show the dialog after animation completes
+        Platform.runLater(() -> {
+            // Create alert dialog
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.INFORMATION
+            );
+            
+            alert.setTitle("Game Over");
+            
+            if (isPlayerWinner) {
+                alert.setHeaderText("You Win!");
+                alert.setContentText("Congratulations, you have won the game!");
+            } else {
+                alert.setHeaderText("You Lose!");
+                alert.setContentText("Better luck next time!");
+            }
+            
+            // Show dialog and return to main menu when closed
+            alert.showAndWait().ifPresent(response -> exitGame());
+        });
     }
     
     /**
@@ -1072,24 +1166,15 @@ public class GameController {
     
     /**
      * Shows a notification about an AI player's color selection.
+     * Only shown for wild cards.
      * 
      * @param playerName The AI player's name
      * @param selectedColor The selected color
      */
-    private void showAIColorSelectionNotification(String playerName, CardColor selectedColor) {
-        // Create the notification
-        ColorNotification notification = new ColorNotification(playerName, selectedColor);
-        
-        // Add the notification to the game pane
-        StackPane notificationPane = notification.getNotificationPane();
-        gamePane.getChildren().add(notificationPane);
-        
-        // Position the notification at the top center of the game pane
-        notificationPane.setLayoutX((gamePane.getWidth() - notificationPane.getMaxWidth()) / 2);
-        notificationPane.setLayoutY(50);
-        
-        // Show the notification
-        notification.show();
+    private void showColorSelectionNotification(String playerName, CardColor selectedColor) {
+        // Use the dedicated method for color change notifications
+        ActionNotification notification = ActionNotification.createColorChangeNotification(playerName, selectedColor);
+        showNotification(notification);
     }
     
     /**
@@ -1262,5 +1347,154 @@ public class GameController {
         
         // Start the animation
         animation.play();
+    }
+    
+    /**
+     * Updates UNO indicators for all players based on their card count.
+     */
+    private void updateUnoIndicators() {
+        // Remove any existing UNO indicators first
+        removeExistingUnoIndicators();
+        
+        // Check each player's card count
+        List<Player> players = game.getPlayers();
+        for (int i = 0; i < players.size(); i++) {
+            Player player = players.get(i);
+            
+            // Show UNO indicator if player has exactly one card
+            if (player.getCardCount() == 1) {
+                switch (i) {
+                    case 0: // Human player (bottom)
+                        addUnoIndicatorToLabel(bottomPlayerNameLabel);
+                        break;
+                    case 1: // Top opponent
+                        addUnoIndicatorToLabel(topPlayerNameLabel);
+                        break;
+                    case 2: // Left opponent (if present)
+                        addUnoIndicatorToLabel(leftPlayerNameLabel);
+                        break;
+                    case 3: // Right opponent (if present)
+                        addUnoIndicatorToLabel(rightPlayerNameLabel);
+                        break;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Removes any existing UNO indicator badges from all player name labels.
+     */
+    private void removeExistingUnoIndicators() {
+        // Remove graphics from all name labels
+        for (Label nameLabel : new Label[]{bottomPlayerNameLabel, topPlayerNameLabel, leftPlayerNameLabel, rightPlayerNameLabel}) {
+            if (nameLabel != null) {
+                // Remove the UNO indicator graphic
+                nameLabel.setGraphic(null);
+                nameLabel.setGraphicTextGap(0);
+                nameLabel.setContentDisplay(ContentDisplay.LEFT);
+            }
+        }
+    }
+    
+    /**
+     * Adds a UNO indicator badge DIRECTLY INSIDE the player name label.
+     * 
+     * @param nameLabel The name label to add the indicator to
+     */
+    private void addUnoIndicatorToLabel(Label nameLabel) {
+        if (nameLabel == null) return;
+        
+        // Create the UNO indicator as a StackPane
+        StackPane indicator = new StackPane();
+        indicator.setMaxWidth(30);
+        indicator.setMaxHeight(30);
+        indicator.setPrefWidth(30);
+        indicator.setPrefHeight(30);
+        
+        // Create the background circle
+        Circle badge = new Circle(15);
+        badge.setFill(Color.rgb(227, 35, 45)); // UNO red
+        badge.setStroke(Color.WHITE);
+        badge.setStrokeWidth(2);
+        
+        // Create the "UNO" text
+        Label unoText = new Label("UNO");
+        unoText.setTextFill(Color.WHITE);
+        unoText.setStyle("-fx-font-weight: bold; -fx-font-size: 10px;");
+        
+        // Add components to the indicator
+        indicator.getChildren().addAll(badge, unoText);
+        
+        // Add pulsing animation
+        ScaleTransition pulse = new ScaleTransition(Duration.millis(800), indicator);
+        pulse.setFromX(0.8);
+        pulse.setFromY(0.8);
+        pulse.setToX(1.2);
+        pulse.setToY(1.2);
+        pulse.setCycleCount(Animation.INDEFINITE);
+        pulse.setAutoReverse(true);
+        
+        // Set the indicator as the graphic of the name label
+        // Position depends on whether it's a side player or top/bottom player
+        if (nameLabel == leftPlayerNameLabel) {
+            nameLabel.setGraphic(indicator);
+            nameLabel.setGraphicTextGap(10);
+            nameLabel.setContentDisplay(ContentDisplay.RIGHT); // Add graphic to the right of text
+        } else if (nameLabel == rightPlayerNameLabel) {
+            nameLabel.setGraphic(indicator);
+            nameLabel.setGraphicTextGap(10);
+            nameLabel.setContentDisplay(ContentDisplay.LEFT); // Add graphic to the left of text
+        } else { // Top or bottom player
+            nameLabel.setGraphic(indicator);
+            nameLabel.setGraphicTextGap(10);
+            nameLabel.setContentDisplay(ContentDisplay.RIGHT); // Add graphic to the right of text
+        }
+        
+        // Start the animation
+        pulse.play();
+    }
+    
+    /**
+     * Adds a test button to trigger UNO indicator testing.
+     * This method is only for development/testing purposes.
+     */
+    private void addTestButton() {
+        Button testButton = new Button("Test UNO Indicators");
+        testButton.setLayoutX(10);
+        testButton.setLayoutY(10);
+        testButton.setStyle("-fx-background-color: #666; -fx-text-fill: white;");
+        
+        // Add click handler to test UNO indicators
+        testButton.setOnAction(event -> {
+            testUnoIndicators();
+        });
+        
+        // Add to game pane
+        gamePane.getChildren().add(testButton);
+    }
+    
+    /**
+     * Temporarily shows UNO indicators for all players to test positioning.
+     * This method is only for development/testing purposes.
+     */
+    private void testUnoIndicators() {
+        // First remove any existing indicators
+        removeExistingUnoIndicators();
+        
+        // Then add indicators for all player positions
+        addUnoIndicatorToLabel(bottomPlayerNameLabel);
+        addUnoIndicatorToLabel(topPlayerNameLabel);
+        
+        // Only add for side players if they're in the game
+        if (game.getPlayers().size() > 2) {
+            addUnoIndicatorToLabel(leftPlayerNameLabel);
+        }
+        
+        if (game.getPlayers().size() > 3) {
+            addUnoIndicatorToLabel(rightPlayerNameLabel);
+        }
+        
+        // Show a notification explaining the test
+        showActionNotification("TESTING", "UNO indicators shown for all players");
     }
 } 
