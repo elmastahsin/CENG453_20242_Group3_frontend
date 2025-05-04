@@ -967,7 +967,7 @@ public class GameController {
         // Call the game end API if we have a valid game ID
         if (gameId != null) {
             String sanitizedWinnerName = winnerName.replace(" ", "");
-            String requestBody = String.format("{\"id\": %d, \"winner_username\": \"%s\"}", gameId, sanitizedWinnerName);
+            String requestBody = String.format("{\"id\": %d, \"winnerUsername\": \"%s\"}", gameId, sanitizedWinnerName);
             
             apiClient.post("/game/end", requestBody, 
                 response -> System.out.println("Game end API called successfully: " + response),
