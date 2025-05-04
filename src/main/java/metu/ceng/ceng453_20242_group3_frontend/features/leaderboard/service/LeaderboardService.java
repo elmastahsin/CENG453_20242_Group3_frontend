@@ -105,11 +105,19 @@ public class LeaderboardService {
         // Convert the data entries to LeaderboardEntry objects
         List<LeaderboardEntry> entries = new ArrayList<>();
         for (JsonNode entryNode : dataNode) {
-            int id = entryNode.get("id").asInt();
             String username = entryNode.get("username").asText();
             int score = entryNode.get("score").asInt();
             
-            entries.add(new LeaderboardEntry(id, username, score));
+            // Create LeaderboardEntry with placeholder rank (will be updated after sorting)
+            entries.add(new LeaderboardEntry(0, username, score));
+        }
+        
+        // Sort entries by score in descending order
+        entries.sort((e1, e2) -> Integer.compare(e2.getScore(), e1.getScore()));
+        
+        // Assign ranks based on position in the sorted list
+        for (int i = 0; i < entries.size(); i++) {
+            entries.get(i).setRank(i + 1); // Ranks are 1-based
         }
         
         return entries;
