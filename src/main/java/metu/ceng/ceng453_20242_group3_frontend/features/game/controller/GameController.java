@@ -54,6 +54,11 @@ import metu.ceng.ceng453_20242_group3_frontend.features.game.view.CardRenderer;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ColorSelectionDialog;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ColorNotification;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ActionNotification;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.view.NotificationManager;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.view.UnoIndicatorManager;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.controller.GameTableController;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.controller.AIPlayerController;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.controller.CardAnimationController;
 
 /**
  * Controller for the game view.
@@ -132,6 +137,13 @@ public class GameController {
     // Add a field to store the game table animation
     private javafx.animation.Timeline gameTableAnimation;
     
+    // Sub-controllers
+    private NotificationManager notificationManager;
+    private UnoIndicatorManager unoIndicatorManager;
+    private GameTableController gameTableController;
+    private AIPlayerController aiPlayerController;
+    private CardAnimationController cardAnimationController;
+    
     @FXML
     private void initialize() {
         // Set local player name from session
@@ -143,8 +155,26 @@ public class GameController {
         // Set up exit game button
         exitGameButton.setOnAction(event -> exitGame());
         
-        // Set up game table animations
-        setupGameTableAnimations();
+        // Initialize managers
+        notificationManager = new NotificationManager(gamePane);
+        unoIndicatorManager = new UnoIndicatorManager(
+            topPlayerNameLabel,
+            leftPlayerNameLabel,
+            rightPlayerNameLabel,
+            bottomPlayerNameLabel
+        );
+        
+        // Initialize game table controller
+        gameTableController = new GameTableController(
+            gamePane,
+            topPlayerArea,
+            leftPlayerArea,
+            rightPlayerArea,
+            bottomPlayerArea
+        );
+        
+        // Card animation controller will be initialized when the game starts
+        // since it needs the discard pile container
     }
     
     /**
@@ -169,6 +199,15 @@ public class GameController {
             playerCount
         );
         
+        // FORCE the direction to be COUNTER_CLOCKWISE
+        if (game.getDirection() != Direction.COUNTER_CLOCKWISE) {
+            System.out.println("!!! WARNING: Game direction was not counter-clockwise, forcing it now !!!");
+            game.setDirection(Direction.COUNTER_CLOCKWISE);
+        }
+        
+        // Debug output to confirm game direction
+        System.out.println("GAME INITIALIZATION - DIRECTION IS: " + game.getDirection());
+        
         // Reset first card flag
         firstCardPlayed = false;
         
@@ -182,21 +221,82 @@ public class GameController {
         Player humanPlayer = new Player(username);
         game.addPlayer(humanPlayer);
         
-        // Add AI players
-        for (int i = 0; i < aiPlayerCount; i++) {
-            String aiName = "Opponent " + (i+1);
+        // Create AI player names in the correct order for the layout
+        List<String> aiNames = new ArrayList<>();
+        
+        // First add right opponent (Opponent 1)
+        if (aiPlayerCount >= 2) {
+            String aiName = "Opponent 1";
+            aiNames.add(aiName);
             Player aiPlayer = new Player(aiName, true);
             game.addPlayer(aiPlayer);
-            
-            // Legacy AI players (to be removed in future)
             aiPlayers.add(new ComputerAIPlayer(aiName));
+            System.out.println("Added " + aiName + " (right position)");
         }
         
+        // Next add top opponent (Opponent 2)
+        String topName = (aiPlayerCount == 1) ? "Opponent 1" : "Opponent 2";
+        aiNames.add(topName);
+        Player topPlayer = new Player(topName, true);
+        game.addPlayer(topPlayer);
+        aiPlayers.add(new ComputerAIPlayer(topName));
+        System.out.println("Added " + topName + " (top position)");
+        
+        // Finally add left opponent (Opponent 3) if needed
+        if (aiPlayerCount >= 3) {
+            String aiName = "Opponent 3";
+            aiNames.add(aiName);
+            Player aiPlayer = new Player(aiName, true);
+            game.addPlayer(aiPlayer);
+            aiPlayers.add(new ComputerAIPlayer(aiName));
+            System.out.println("Added " + aiName + " (left position)");
+        }
+        
+        // Print the final player list for debugging
+        System.out.println("Final player order for COUNTER_CLOCKWISE movement:");
+        for (int i = 0; i < game.getPlayers().size(); i++) {
+            System.out.println("Index " + i + ": " + game.getPlayers().get(i).getName());
+        }
+        
+        // Initialize sub-controllers that need the game model
+        cardAnimationController = new CardAnimationController(gamePane, discardPileContainer);
+        
+        // Initialize AI player controller with a callback for card plays
+        aiPlayerController = new AIPlayerController(
+            game, 
+            notificationManager, 
+            gameTableController,
+            new AIPlayerController.CardPlayCallback() {
+                @Override
+                public void onCardPlayed(int aiIndex, Card card) {
+                    // Update the UI after AI plays a card
+                    updateUI();
+                    updateDirectionIndicator();
+                    updateTurnLabel();
+                }
+                
+                @Override
+                public void onCardDrawn() {
+                    // Update the UI after AI draws a card
+                    updateUI();
+                    updateTurnLabel();
+                }
+                
+                @Override
+                public void onGameEnd(boolean isAIWinner) {
+                    handleGameEnd(false);
+                }
+            }
+        );
+        
         // Configure player areas based on player count
-        setupPlayerAreas(game.getPlayerCount().getCount());
+        gameTableController.setupPlayerAreas(game, aiNames);
         
         // Start the game (this deals cards and initializes the discard pile)
         game.startGame();
+        
+        // Ensure direction indicator is updated immediately
+        updateDirectionIndicator();
         
         // When a new game starts, mark all cards as playable for the initial play
         for (Player player : game.getPlayers()) {
@@ -204,9 +304,6 @@ public class GameController {
                 card.setPlayable(true);
             }
         }
-        
-        // Set up the game table
-        setupGameTableAnimations();
 
         // Update the UI with initial game state
         updateUI();
@@ -216,6 +313,8 @@ public class GameController {
         
         // Update UNO indicators based on card counts
         updateUnoIndicators();
+        
+        updateTurnLabel();
     }
     
     /**
@@ -232,30 +331,37 @@ public class GameController {
         drawPileContainer.getChildren().clear();
         discardPileContainer.getChildren().clear();
         
+        // First make sure playable cards are up-to-date
+        if (game != null) {
+            game.updatePlayableCards();
+        }
+        
         // Display player cards
         List<Player> players = game.getPlayers();
         if (!players.isEmpty()) {
             // Human player's cards (always the first player in our design)
             Player humanPlayer = players.get(0);
-            for (Card card : humanPlayer.getHand()) {
-                StackPane cardView = createCardView(card);
-                cardView.setOnMouseClicked(event -> playCard(cardView, card));
-                bottomPlayerCardsContainer.getChildren().add(cardView);
-            }
             
-            // Display AI cards (all other players)
+            // Instead of adding cards directly, use updatePlayerHandVisuals
+            // which handles playability and visual effects
+            updatePlayerHandVisuals();
+            
+            // Display AI cards based on total players and new counterclockwise layout
             if (players.size() > 1) {
-                // Top opponent (always exists if there are AI players)
-                displayOpponentCards(1, topPlayerCardsContainer, false, 180);
+                int totalPlayers = players.size();
                 
-                // Left opponent (if there are at least 3 players total)
-                if (players.size() > 2) {
-                    displayOpponentCards(2, leftPlayerCardsContainer, true, 90);
-                }
-                
-                // Right opponent (if there are 4 players total)
-                if (players.size() > 3) {
-                    displayOpponentCards(3, rightPlayerCardsContainer, true, -90);
+                if (totalPlayers == 2) {
+                    // 2 players: Display Opponent 1 at top (player 1)
+                    displayOpponentCards(1, topPlayerCardsContainer, false, 180);
+                } else if (totalPlayers == 3) {
+                    // 3 players: Display Opponent 1 at right (player 1) and Opponent 2 at top (player 2)
+                    displayOpponentCards(1, rightPlayerCardsContainer, true, -90);
+                    displayOpponentCards(2, topPlayerCardsContainer, false, 180);
+                } else if (totalPlayers == 4) {
+                    // 4 players: Opponent 1 at right, Opponent 2 at top, Opponent 3 at left
+                    displayOpponentCards(1, rightPlayerCardsContainer, true, -90);
+                    displayOpponentCards(2, topPlayerCardsContainer, false, 180);
+                    displayOpponentCards(3, leftPlayerCardsContainer, true, 90);
                 }
             }
         }
@@ -268,6 +374,9 @@ public class GameController {
         
         // Update UNO indicators for all players
         updateUnoIndicators();
+
+        // Always update the direction indicator
+        updateDirectionIndicator();
 
         updateTurnLabel();
     }
@@ -342,12 +451,33 @@ public class GameController {
         
         if (game == null || game.getPlayers().isEmpty()) return;
         
+        // First, make sure the playable status of cards is up-to-date
+        game.updatePlayableCards();
+        
         Player humanPlayer = game.getPlayers().get(0);
         for (Card card : humanPlayer.getHand()) {
             StackPane cardView = createCardView(card);
             
-            // Only enable click for playable cards
-            if (card.isPlayable() && game.getCurrentPlayerIndex() == 0) {
+            // Make sure WILD_DRAW_FOUR cards are checked again
+            boolean isPlayable = card.isPlayable();
+            
+            // Extra validation for WILD_DRAW_FOUR to prevent UI bugs
+            if (isPlayable && card.getAction() == CardAction.WILD_DRAW_FOUR) {
+                // Double check if player has matching color cards
+                for (Card playerCard : humanPlayer.getHand()) {
+                    if (playerCard != card && 
+                        playerCard.getColor() == game.getCurrentColor() && 
+                        playerCard.getColor() != CardColor.MULTI) {
+                        
+                        isPlayable = false;
+                        System.out.println("Disabling WILD_DRAW_FOUR in UI - player has matching color card: " + playerCard);
+                        break;
+                    }
+                }
+            }
+            
+            // Only enable click for playable cards and when it's player's turn
+            if (isPlayable && game.getCurrentPlayerIndex() == 0) {
                 // Add glow effect to playable cards
                 cardView.setEffect(new javafx.scene.effect.DropShadow(15, Color.GOLD));
                 cardView.setStyle("-fx-cursor: hand;");
@@ -355,12 +485,44 @@ public class GameController {
             } else {
                 // For unplayable cards, set a dimmed appearance
                 cardView.setOpacity(0.8);
-                // Still allow clicking but will show error message if attempted
-                cardView.setOnMouseClicked(event -> playCard(cardView, card));
+                // Remove click handler for unplayable cards to prevent attempts
+                // that would fail the validation checks
+                if (!isPlayable) {
+                    // Add a different click handler that explains why the card can't be played
+                    cardView.setOnMouseClicked(event -> {
+                        if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
+                            showCardUnplayableMessage("You can't play a Wild Draw Four when you have cards matching the current color.");
+                        } else {
+                            showCardUnplayableMessage("This card doesn't match the color or value of the top card.");
+                        }
+                    });
+                    cardView.setStyle("-fx-cursor: not-allowed;");
+                } else {
+                    // Card is playable but it's not player's turn
+                    cardView.setOnMouseClicked(event -> {
+                        showCardUnplayableMessage("It's not your turn.");
+                    });
+                    cardView.setStyle("-fx-cursor: wait;");
+                }
             }
             
             bottomPlayerCardsContainer.getChildren().add(cardView);
         }
+    }
+    
+    /**
+     * Shows a message explaining why a card can't be played
+     * 
+     * @param message The explanation message
+     */
+    private void showCardUnplayableMessage(String message) {
+        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+            javafx.scene.control.Alert.AlertType.INFORMATION
+        );
+        alert.setTitle("Invalid Move");
+        alert.setHeaderText("Can't Play This Card");
+        alert.setContentText(message);
+        alert.show();
     }
     
     /**
@@ -379,6 +541,7 @@ public class GameController {
         
         // Make sure it's the player's turn
         if (currentPlayer.isAI() || game.getCurrentPlayerIndex() != 0) {
+            showCardUnplayableMessage("It's not your turn.");
             return;
         }
         
@@ -390,9 +553,18 @@ public class GameController {
             
             // For wild cards, handle color selection
             if (card.isWildCard()) {
-                handleWildCardColorSelection(card, () -> {
-                    finishCardPlay(cardView, card);
-                });
+                // For WILD_DRAW_FOUR, check if it's valid (should be in initial state)
+                if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
+                    // In the initial state, WILD_DRAW_FOUR should be playable
+                    handleWildCardColorSelection(card, () -> {
+                        finishCardPlay(cardView, card);
+                    });
+                } else {
+                    // Regular wild card
+                    handleWildCardColorSelection(card, () -> {
+                        finishCardPlay(cardView, card);
+                    });
+                }
             } else {
                 // For regular cards, set the game color to the card's color
                 if (card.getColor() != CardColor.MULTI) {
@@ -403,17 +575,33 @@ public class GameController {
             return;
         }
         
+        // Make sure the playable status is up-to-date
+        game.updatePlayableCards();
+        
         // Check if the card is playable according to UNO rules
         if (!card.isPlayable()) {
-            // Show a message that this card can't be played
-            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-                javafx.scene.control.Alert.AlertType.INFORMATION
-            );
-            alert.setTitle("Invalid Move");
-            alert.setHeaderText("Can't Play This Card");
-            alert.setContentText("This card doesn't match the color or value of the top card.");
-            alert.show();
+            showCardUnplayableMessage("This card doesn't match the color or value of the top card.");
             return;
+        }
+        
+        // Extra validation for WILD_DRAW_FOUR
+        if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
+            // Check if player has cards matching the current color
+            boolean hasMatchingColorCard = false;
+            for (Card playerCard : currentPlayer.getHand()) {
+                if (playerCard != card && 
+                    playerCard.getColor() == game.getCurrentColor() && 
+                    playerCard.getColor() != CardColor.MULTI) {
+                    
+                    hasMatchingColorCard = true;
+                    break;
+                }
+            }
+            
+            if (hasMatchingColorCard) {
+                showCardUnplayableMessage("You can't play a Wild Draw Four when you have cards matching the current color.");
+                return;
+            }
         }
         
         // Set the first card played flag (for initial card)
@@ -457,10 +645,10 @@ public class GameController {
         Player player = game.getPlayers().get(0); // Human player
         
         // Automatically declare UNO for the player
-        player.setHasCalledUno(true);
-        
-        // Show UNO call notification
-        showUnoCallNotification(player.getName());
+        if (player.declareUno()) {
+            // Show UNO call notification
+            notificationManager.showUnoCallNotification(player.getName());
+        }
     }
     
     /**
@@ -471,36 +659,9 @@ public class GameController {
      * @return A message describing the card's action or null if no notification should be shown
      */
     private String getActionMessage(Card card, String targetPlayerName) {
-        // ONLY show notifications for action cards, NOT for number cards
-        if (!card.isActionCard()) {
-            return null; // Return null to indicate no notification should be shown
-        }
-        
-        switch (card.getAction()) {
-            case SKIP:
-                return "plays " + card.getColor() + " Skip! " + targetPlayerName + "'s turn is skipped";
-                
-            case REVERSE:
-                if (game.getPlayers().size() == 2) {
-                    // In 2-player game, Reverse acts like Skip
-                    return "plays " + card.getColor() + " Reverse! " + targetPlayerName + "'s turn is skipped";
-                } else {
-                    return "plays " + card.getColor() + " Reverse! Direction is changed";
-                }
-                
-            case DRAW_TWO:
-                return "plays " + card.getColor() + " Draw Two! " + targetPlayerName + " draws 2 cards";
-                
-            case WILD:
-                // Color change notification is handled separately
-                return null;
-                
-            case WILD_DRAW_FOUR:
-                return "plays Wild Draw Four! " + targetPlayerName + " draws 4 cards, color is now " + game.getCurrentColor();
-                
-            default:
-                return null; // Return null for any other cards that don't need notifications
-        }
+        // Delegate to notification manager
+        Player currentPlayer = game.getCurrentPlayer();
+        return notificationManager.getActionMessage(card, currentPlayer != null ? currentPlayer.getName() : "", targetPlayerName);
     }
     
     /**
@@ -510,6 +671,19 @@ public class GameController {
      * @param card The card model to play
      */
     private void finishCardPlay(StackPane cardView, Card card) {
+        // Store the original position of the card before removing it from the container
+        double originalX = 0;
+        double originalY = 0;
+        
+        try {
+            // Convert the card's position to scene coordinates
+            Bounds cardBounds = cardView.localToScene(cardView.getBoundsInLocal());
+            originalX = cardBounds.getMinX();
+            originalY = cardBounds.getMinY();
+        } catch (Exception e) {
+            System.out.println("Warning: Could not get original card position");
+        }
+        
         // Remove card from player's hand visually
         bottomPlayerCardsContainer.getChildren().remove(cardView);
         
@@ -526,13 +700,13 @@ public class GameController {
         if (success) {
             // Show wild card color notification separately to ensure it's always displayed
             if (card.isWildCard() && game.getCurrentColor() != CardColor.MULTI) {
-                showColorSelectionNotification(currentPlayer.getName(), game.getCurrentColor());
+                notificationManager.showColorSelectionNotification(currentPlayer.getName(), game.getCurrentColor());
             }
             
             // ONLY show notifications for special actions
-            String actionMessage = getActionMessage(card, nextPlayerName);
+            String actionMessage = notificationManager.getActionMessage(card, currentPlayer.getName(), nextPlayerName);
             if (actionMessage != null) {
-                showActionNotification(currentPlayer.getName(), actionMessage);
+                notificationManager.showActionNotification(currentPlayer.getName(), actionMessage);
             }
             
             // Check for UNO declaration when player will have 1 card left
@@ -542,21 +716,22 @@ public class GameController {
                     declareUno();
                 } else {
                     // AI players also automatically declare UNO
-                    currentPlayer.setHasCalledUno(true);
-                    showUnoCallNotification(currentPlayer.getName());
+                    currentPlayer.declareUno();
+                    notificationManager.showUnoCallNotification(currentPlayer.getName());
                 }
             }
             
-            // Now handle animation - but don't rely on the cardView which might be null after removal
-            StackPane cardViewCopy = CardRenderer.createCardView(card);
-            
-            // Position the card view at the same position as the original card
-            cardViewCopy.setLayoutX(cardView.getLayoutX());
-            cardViewCopy.setLayoutY(cardView.getLayoutY());
-            gamePane.getChildren().add(cardViewCopy);
-            
-            // Animate to discard pile
-            animateCardToDiscardPile(cardViewCopy);
+            // Use the CardAnimationController to animate the card to the discard pile
+            cardAnimationController.animateCardFromPosition(card, originalX, originalY, new CardAnimationController.AnimationCallback() {
+                @Override
+                public void onAnimationComplete() {
+                    // Update the discard pile
+                    setupDiscardPile();
+                    
+                    // Update UNO indicators
+                    updateUnoIndicators();
+                }
+            });
             
             // Update direction indicator
             updateDirectionIndicator();
@@ -574,244 +749,7 @@ public class GameController {
             updatePlayableCards();
             
             // Handle AI turns
-            handleAITurns();
-        }
-    }
-    
-    /**
-     * Shows a notification about a player declaring UNO.
-     * 
-     * @param playerName The player's name
-     */
-    private void showUnoCallNotification(String playerName) {
-        ActionNotification notification = ActionNotification.createUnoCallNotification(playerName);
-        showNotification(notification);
-    }
-    
-    /**
-     * Shows a notification about a game action.
-     * 
-     * @param playerName The player's name
-     * @param actionMessage The action message
-     */
-    private void showActionNotification(String playerName, String actionMessage) {
-        ActionNotification notification = new ActionNotification(playerName, actionMessage);
-        showNotification(notification);
-    }
-    
-    /**
-     * Displays a notification in the game pane.
-     * 
-     * @param notification The notification to display
-     */
-    private void showNotification(ActionNotification notification) {
-        // Add the notification to the game pane
-        StackPane notificationPane = notification.getNotificationPane();
-        gamePane.getChildren().add(notificationPane);
-        
-        // Position the notification at the top center of the game pane
-        notificationPane.setLayoutX((gamePane.getWidth() - notificationPane.getMaxWidth()) / 2);
-        notificationPane.setLayoutY(50);
-        
-        // Show the notification
-        notification.show();
-    }
-    
-    /**
-     * Handles AI turns when it's an AI player's turn
-     */
-    private void handleAITurns() {
-        if (!isGameRunning || game == null) {
-            return;
-        }
-        
-        // Debug information
-        System.out.println("Checking for AI turns, current player index: " + game.getCurrentPlayerIndex());
-        
-        // If it's AI's turn, trigger AI move with a small delay
-        int currentPlayerIndex = game.getCurrentPlayerIndex();
-        if (currentPlayerIndex > 0) { // Player at index 0 is always human
-            // Create a delay so AI doesn't play immediately
-            javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(Duration.millis(1000));
-            pause.setOnFinished(e -> {
-                int aiIndex = currentPlayerIndex;
-                // Make sure it's still the same AI's turn after the delay
-                if (game.getCurrentPlayerIndex() == aiIndex) {
-                    System.out.println("AI player " + aiIndex + " is taking their turn");
-                    simpleAITurn(aiIndex);
-                }
-            });
-            pause.play();
-        }
-    }
-    
-    /**
-     * Simulates a simple AI turn.
-     *
-     * @param aiIndex The index of the AI player in the game's player list
-     */
-    private void simpleAITurn(int aiIndex) {
-        Player aiPlayer = game.getPlayers().get(aiIndex);
-        
-        // Make sure it's this AI's turn
-        if (!game.getCurrentPlayer().equals(aiPlayer)) {
-            System.out.println("Not AI player's turn anymore, skipping AI move");
-            return;
-        }
-        
-        System.out.println("AI player " + aiPlayer.getName() + " is checking for playable cards");
-        
-        // Update which cards are playable
-        game.updatePlayableCards();
-        
-        // Find a playable card
-        Card cardToPlay = null;
-        for (Card card : aiPlayer.getHand()) {
-            if (card.isPlayable()) {
-                cardToPlay = card;
-                System.out.println("AI will play: " + card);
-                break;
-            }
-        }
-        
-        // Play the card or draw if no playable card
-        if (cardToPlay != null) {
-            // Get the corresponding AI instance
-            ComputerAIPlayer aiInstance = aiPlayers.get(aiIndex - 1);
-            
-            final Card finalCardToPlay = cardToPlay; // Need final var for lambda
-            
-            // Handle wild card color selection
-            if (cardToPlay.isWildCard()) {
-                // Select a color
-                CardColor selectedColor = aiInstance.selectWildCardColor();
-                
-                // Set the color in the game
-                game.setCurrentColor(selectedColor);
-                
-                // Small delay before playing the card
-                javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(Duration.millis(500));
-                pause.setOnFinished(e -> {
-                    playAICard(aiIndex, finalCardToPlay);
-                });
-                pause.play();
-            } else {
-                // Play non-wild card directly after a short delay
-                javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(Duration.millis(500));
-                pause.setOnFinished(e -> {
-                    playAICard(aiIndex, finalCardToPlay);
-                });
-                pause.play();
-            }
-        } else {
-            System.out.println("AI has no playable cards, will draw a card");
-            
-            // Delay before drawing
-            javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(Duration.millis(500));
-            pause.setOnFinished(e -> {
-                // Draw a card
-                Card drawnCard = game.drawCardForCurrentPlayer();
-                System.out.println("AI drew: " + (drawnCard != null ? drawnCard.toString() : "null"));
-                
-                // Update the UI
-                updateUI();
-                updateTurnLabel();
-                
-                // If it's now the human player's turn, update playable cards
-                if (!game.getCurrentPlayer().isAI()) {
-                    updatePlayableCards();
-                    
-                    // Pulse the human player's area since it's their turn
-                    updatePlayerAreaAnimations();
-                } else {
-                    // Otherwise, handle the next AI turn
-                    handleAITurns();
-                }
-            });
-            pause.play();
-        }
-    }
-    
-    /**
-     * Plays a card for an AI player.
-     * 
-     * @param aiIndex The index of the AI player
-     * @param card The card to play
-     */
-    private void playAICard(int aiIndex, Card card) {
-        Player aiPlayer = game.getPlayers().get(aiIndex);
-        
-        // Make sure it's still this AI's turn
-        if (!game.getCurrentPlayer().equals(aiPlayer)) {
-            System.out.println("Not AI player's turn anymore, skipping card play");
-            return;
-        }
-        
-        int originalCardCount = aiPlayer.getCardCount();
-        
-        // Get the next player who will be affected by the action
-        Player nextPlayer = game.getNextPlayer();
-        String nextPlayerName = nextPlayer != null ? nextPlayer.getName() : "Unknown";
-        
-        // Play the card
-        boolean success = game.playCard(card);
-        System.out.println("AI played card: " + card + ", success: " + success);
-        
-        if (success) {
-            // Show wild card color notification separately to ensure it's always displayed
-            if (card.isWildCard() && game.getCurrentColor() != CardColor.MULTI) {
-                showColorSelectionNotification(aiPlayer.getName(), game.getCurrentColor());
-            }
-            
-            // ONLY show notifications for special actions
-            String actionMessage = getActionMessage(card, nextPlayerName);
-            if (actionMessage != null) {
-                showActionNotification(aiPlayer.getName(), actionMessage);
-            }
-            
-            // Check for UNO declaration when player will have 1 card left
-            if (originalCardCount == 2 && aiPlayer.getCardCount() == 1) {
-                // AI automatically declares UNO
-                aiPlayer.setHasCalledUno(true);
-                showUnoCallNotification(aiPlayer.getName());
-            }
-            
-            // Update the UI
-            updateUI();
-            updateDirectionIndicator();
-            updateTurnLabel();
-            
-            // Check for game over
-            if (game.isGameEnded()) {
-                handleGameEnd(false);
-                return;
-            }
-            
-            // If there are more AI turns, handle them
-            if (game.getCurrentPlayer().isAI()) {
-                handleAITurns();
-            } else {
-                // Otherwise, update which cards are playable for the human player
-                updatePlayableCards();
-                
-                // Pulse the human player's area since it's their turn
-                updatePlayerAreaAnimations();
-            }
-        } else {
-            System.out.println("AI failed to play card: " + card);
-            
-            // If play failed (which shouldn't happen), try drawing instead
-            Card drawnCard = game.drawCardForCurrentPlayer();
-            updateUI();
-            updateTurnLabel();
-            
-            // Continue game flow
-            if (game.getCurrentPlayer().isAI()) {
-                handleAITurns();
-            } else {
-                updatePlayableCards();
-                updatePlayerAreaAnimations();
-            }
+            aiPlayerController.handleAITurns();
         }
     }
     
@@ -819,13 +757,36 @@ public class GameController {
      * Updates the direction indicator based on the game's direction
      */
     private void updateDirectionIndicator() {
-        boolean isClockwise = game.getDirection() == Direction.CLOCKWISE;
+        if (game == null) {
+            return;
+        }
+        
+        Direction gameDirection = game.getDirection();
+        
+        System.out.println("### UPDATING DIRECTION INDICATOR - CURRENT DIRECTION: " + gameDirection + " ###");
+        
+        boolean isClockwise = gameDirection == Direction.CLOCKWISE;
         String imagePath = isClockwise 
             ? "/images/arrow-clockwise.png" 
             : "/images/arrow-counterclockwise.png";
         
         Image directionImage = new Image(getClass().getResourceAsStream(imagePath));
         directionIndicator.setImage(directionImage);
+        
+        // Add pulsing effect to make the direction more noticeable
+        if (gameTableAnimation != null) {
+            gameTableAnimation.stop();
+        }
+        
+        // Create a pulsing effect
+        ScaleTransition pulse = new ScaleTransition(Duration.millis(1000), directionIndicator);
+        pulse.setFromX(1.0);
+        pulse.setFromY(1.0);
+        pulse.setToX(1.2);
+        pulse.setToY(1.2);
+        pulse.setCycleCount(2);
+        pulse.setAutoReverse(true);
+        pulse.play();
     }
     
     /**
@@ -846,12 +807,14 @@ public class GameController {
             currentTurnLabel.setText("YOUR TURN");
             currentTurnLabel.setStyle("-fx-background-color: rgba(0, 153, 51, 0.8);"); // Green for player's turn
         } else {
-            currentTurnLabel.setText(currentPlayer.getName() + "'S TURN");
+            // Display the appropriate opponent name based on new counterclockwise layout
+            String playerName = currentPlayer.getName();
+            currentTurnLabel.setText(playerName + "'S TURN");
             currentTurnLabel.setStyle("-fx-background-color: rgba(217, 83, 79, 0.8);"); // Red for opponent's turn
         }
         
         // Update which player area is pulsing
-        updatePlayerAreaAnimations();
+        gameTableController.updatePlayerAreaAnimations(game);
     }
     
     /**
@@ -872,11 +835,7 @@ public class GameController {
             
             // For wild cards, use the special card renderer with color indicator
             if (topCard.isWildCard() && game.getCurrentColor() != null && game.getCurrentColor() != CardColor.MULTI) {
-                if (topCard.getAction() == CardAction.WILD) {
-                    cardView = CardRenderer.createWildCardWithSelectedColor(topCard, game.getCurrentColor());
-                } else {
-                    cardView = CardRenderer.createWildDrawFourWithSelectedColor(topCard, game.getCurrentColor());
-                }
+                cardView = CardRenderer.createWildCardWithSelectedColor(topCard, game.getCurrentColor());
                 
                 // Add a slight rotation for visual interest
                 cardView.setRotate(-5 + (Math.random() * 10));
@@ -955,7 +914,7 @@ public class GameController {
                 updateTurnLabel();
                 
                 // Check if an automatic move is needed for AI
-                handleAITurns();
+                aiPlayerController.handleAITurns();
             });
             
             animation.play();
@@ -964,7 +923,7 @@ public class GameController {
             updateUI();
             updateDirectionIndicator();
             updateTurnLabel();
-            handleAITurns();
+            aiPlayerController.handleAITurns();
         }
     }
     
@@ -976,26 +935,6 @@ public class GameController {
      */
     private StackPane createCardView(Card card) {
         return CardRenderer.createCardView(card);
-    }
-    
-    /**
-     * Advances to the next player's turn
-     */
-    private void nextTurn() {
-        if (!isGameRunning) {
-            return;
-        }
-        
-        // Update current player index by calling game.nextPlayer() method
-        game.nextPlayer();
-        
-        // Update the turn label
-        updateTurnLabel();
-        
-        // If it's AI's turn, simulate AI move
-        if (game.getCurrentPlayerIndex() != 0) {
-            simpleAITurn(game.getCurrentPlayerIndex() - 1);
-        }
     }
     
     /**
@@ -1029,152 +968,42 @@ public class GameController {
     }
     
     /**
-     * Sets up subtle animations for the game players areas
+     * Updates UNO indicators for all players based on their card count.
      */
-    private void setupGameTableAnimations() {
-        // Create animation timelines for each player area
-        javafx.animation.Timeline bottomPlayerAnimation = createPulseAnimation(bottomPlayerArea);
-        javafx.animation.Timeline topPlayerAnimation = createPulseAnimation(topPlayerArea);
-        javafx.animation.Timeline leftPlayerAnimation = createPulseAnimation(leftPlayerArea);
-        javafx.animation.Timeline rightPlayerAnimation = createPulseAnimation(rightPlayerArea);
-        
-        // Store animations for later control
-        playerAnimations = new javafx.animation.Timeline[] {
-            bottomPlayerAnimation, topPlayerAnimation, leftPlayerAnimation, rightPlayerAnimation
-        };
-        
-        // Find the game table element
-        javafx.scene.Node gameTable = findGameTable();
-        
-        // Create the table animation if the table was found
-        if (gameTable != null) {
-            // Use the same animation timing as player animations for sync
-            gameTableAnimation = createPulseAnimation(gameTable);
-            gameTableAnimation.pause(); // Start paused
-        }
+    private void updateUnoIndicators() {
+        // Use the UNO indicator manager to update indicators
+        unoIndicatorManager.updateUnoIndicators(game.getPlayers());
     }
     
     /**
-     * Finds the game table element in the scene graph
-     * 
-     * @return The game table node or null if not found
+     * Adds a test button to trigger UNO indicator testing.
+     * This method is only for development/testing purposes.
      */
-    private javafx.scene.Node findGameTable() {
-        // Look through the StackPane in the center of the grid
-        for (javafx.scene.Node node : gamePane.getChildrenUnmodifiable()) {
-            if (node instanceof javafx.scene.layout.GridPane) {
-                javafx.scene.layout.GridPane gridPane = (javafx.scene.layout.GridPane) node;
-                
-                for (javafx.scene.Node child : gridPane.getChildren()) {
-                    // Find the center stack pane
-                    Integer colIndex = javafx.scene.layout.GridPane.getColumnIndex(child);
-                    Integer rowIndex = javafx.scene.layout.GridPane.getRowIndex(child);
-                    
-                    if (colIndex != null && rowIndex != null && colIndex == 1 && rowIndex == 1) {
-                        if (child instanceof javafx.scene.layout.StackPane) {
-                            javafx.scene.layout.StackPane centerPane = (javafx.scene.layout.StackPane) child;
-                            
-                            // Find the game table inside the stack pane
-                            for (javafx.scene.Node tableCandidate : centerPane.getChildren()) {
-                                if (tableCandidate instanceof javafx.scene.layout.StackPane &&
-                                    tableCandidate.getStyleClass().contains("game-table")) {
-                                    return tableCandidate;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return null;
+    private void addTestButton() {
+        Button testButton = new Button("Test UNO Indicators");
+        testButton.setLayoutX(10);
+        testButton.setLayoutY(10);
+        testButton.setStyle("-fx-background-color: #666; -fx-text-fill: white;");
+        
+        // Add click handler to test UNO indicators
+        testButton.setOnAction(event -> {
+            testUnoIndicators();
+        });
+        
+        // Add to game pane
+        gamePane.getChildren().add(testButton);
     }
     
     /**
-     * Creates a pulsing animation for a node
-     * 
-     * @param node The node to animate
-     * @return The animation timeline
+     * Temporarily shows UNO indicators for all players to test positioning.
+     * This method is only for development/testing purposes.
      */
-    private javafx.animation.Timeline createPulseAnimation(javafx.scene.Node node) {
-        // Gold color for the glow effect
-        javafx.scene.paint.Color glowColor = javafx.scene.paint.Color.rgb(255, 215, 0, 0.7);
+    private void testUnoIndicators() {
+        // Show test indicators using the UNO indicator manager
+        unoIndicatorManager.showTestUnoIndicators();
         
-        // Create a pulsing glow effect with consistent timing for all elements
-        javafx.animation.Timeline pulseAnimation = new javafx.animation.Timeline(
-            new javafx.animation.KeyFrame(javafx.util.Duration.ZERO, 
-                new javafx.animation.KeyValue(
-                    node.effectProperty(),
-                    new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7))
-                )
-            ),
-            new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1.0), 
-                new javafx.animation.KeyValue(
-                    node.effectProperty(),
-                    new javafx.scene.effect.DropShadow(20, glowColor)
-                )
-            ),
-            new javafx.animation.KeyFrame(javafx.util.Duration.seconds(2.0), 
-                new javafx.animation.KeyValue(
-                    node.effectProperty(),
-                    new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7))
-                )
-            )
-        );
-        
-        pulseAnimation.setCycleCount(javafx.animation.Animation.INDEFINITE);
-        // Start paused - will be activated only for current player
-        pulseAnimation.pause();
-        
-        return pulseAnimation;
-    }
-    
-    /**
-     * Updates which player area is pulsing based on the current player.
-     */
-    private void updatePlayerAreaAnimations() {
-        if (playerAnimations == null || game == null) {
-            return;
-        }
-        
-        // Stop all animations
-        for (javafx.animation.Timeline animation : playerAnimations) {
-            animation.pause();
-        }
-        
-        // Stop game table animation
-        if (gameTableAnimation != null) {
-            gameTableAnimation.pause();
-        }
-        
-        // Set basic shadow for all player areas
-        bottomPlayerArea.setEffect(new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7)));
-        topPlayerArea.setEffect(new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7)));
-        leftPlayerArea.setEffect(new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7)));
-        rightPlayerArea.setEffect(new javafx.scene.effect.DropShadow(10, javafx.scene.paint.Color.rgb(0, 0, 0, 0.7)));
-        
-        // Start the animation for the current player's area
-        int currentPlayerIndex = game.getCurrentPlayerIndex();
-        if (currentPlayerIndex >= 0 && currentPlayerIndex < playerAnimations.length) {
-            playerAnimations[currentPlayerIndex].play();
-            
-            // Also pulse the game table if it's the human player's turn (index 0)
-            if (currentPlayerIndex == 0 && gameTableAnimation != null) {
-                gameTableAnimation.play();
-            }
-        }
-    }
-    
-    /**
-     * Shows a notification about an AI player's color selection.
-     * Only shown for wild cards.
-     * 
-     * @param playerName The AI player's name
-     * @param selectedColor The selected color
-     */
-    private void showColorSelectionNotification(String playerName, CardColor selectedColor) {
-        // Use the dedicated method for color change notifications
-        ActionNotification notification = ActionNotification.createColorChangeNotification(playerName, selectedColor);
-        showNotification(notification);
+        // Show a notification explaining the test
+        notificationManager.showActionNotification("TESTING", "UNO indicators shown for all players");
     }
     
     /**
@@ -1224,277 +1053,5 @@ public class GameController {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-    
-    /**
-     * Sets up the player areas based on total player count.
-     * 
-     * @param playerCount The total number of players (2-4)
-     */
-    private void setupPlayerAreas(int playerCount) {
-        // Configure visibility based on player count
-        switch (playerCount) {
-            case 2: // 2 players: bottom and top
-                topPlayerArea.setVisible(true);
-                leftPlayerArea.setVisible(false);
-                rightPlayerArea.setVisible(false);
-                
-                if (!aiPlayers.isEmpty()) {
-                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
-                } else {
-                    topPlayerNameLabel.setText("Opponent 1");
-                }
-                break;
-                
-            case 3: // 3 players: bottom, top, and left
-                topPlayerArea.setVisible(true);
-                leftPlayerArea.setVisible(true);
-                rightPlayerArea.setVisible(false);
-                
-                if (aiPlayers.size() >= 2) {
-                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
-                    leftPlayerNameLabel.setText(aiPlayers.get(1).getName());
-                } else {
-                    topPlayerNameLabel.setText("Opponent 1");
-                    leftPlayerNameLabel.setText("Opponent 2");
-                }
-                break;
-                
-            case 4: // 4 players: all positions
-                topPlayerArea.setVisible(true);
-                leftPlayerArea.setVisible(true);
-                rightPlayerArea.setVisible(true);
-                
-                if (aiPlayers.size() >= 3) {
-                    topPlayerNameLabel.setText(aiPlayers.get(0).getName());
-                    leftPlayerNameLabel.setText(aiPlayers.get(1).getName());
-                    rightPlayerNameLabel.setText(aiPlayers.get(2).getName());
-                } else {
-                    topPlayerNameLabel.setText("Opponent 1");
-                    leftPlayerNameLabel.setText("Opponent 2");
-                    rightPlayerNameLabel.setText("Opponent 3");
-                }
-                break;
-                
-            default: // Default to 2 players if invalid count
-                topPlayerArea.setVisible(true);
-                leftPlayerArea.setVisible(false);
-                rightPlayerArea.setVisible(false);
-                
-                topPlayerNameLabel.setText("Opponent 1");
-                break;
-        }
-        
-        // For grid layout - must keep areas managed but transparent
-        leftPlayerArea.setManaged(true);
-        rightPlayerArea.setManaged(true);
-        
-        // Make invisible areas transparent instead of completely hiding them
-        if (!leftPlayerArea.isVisible()) {
-            leftPlayerArea.setOpacity(0);
-            leftPlayerNameLabel.setOpacity(0);
-        } else {
-            leftPlayerArea.setOpacity(1);
-            leftPlayerNameLabel.setOpacity(1);
-        }
-        
-        if (!rightPlayerArea.isVisible()) {
-            rightPlayerArea.setOpacity(0);
-            rightPlayerNameLabel.setOpacity(0);
-        } else {
-            rightPlayerArea.setOpacity(1);
-            rightPlayerNameLabel.setOpacity(1);
-        }
-        
-        // Ensure all labels are clearly visible
-        topPlayerNameLabel.toFront();
-        leftPlayerNameLabel.toFront();
-        rightPlayerNameLabel.toFront();
-        bottomPlayerNameLabel.toFront();
-    }
-    
-    /**
-     * Animates a card moving to the discard pile.
-     * 
-     * @param cardView The card view to animate
-     */
-    private void animateCardToDiscardPile(StackPane cardView) {
-        // Calculate the target position (discard pile's center)
-        double targetX = discardPileContainer.localToScene(discardPileContainer.getBoundsInLocal()).getCenterX() - 
-                        gamePane.localToScene(gamePane.getBoundsInLocal()).getMinX() - 40; // Half of card width
-        double targetY = discardPileContainer.localToScene(discardPileContainer.getBoundsInLocal()).getCenterY() - 
-                        gamePane.localToScene(gamePane.getBoundsInLocal()).getMinY() - 60; // Half of card height
-        
-        // Create the animations
-        javafx.animation.TranslateTransition moveCard = new javafx.animation.TranslateTransition(Duration.millis(300), cardView);
-        moveCard.setToX(targetX - cardView.getLayoutX());
-        moveCard.setToY(targetY - cardView.getLayoutY());
-        
-        javafx.animation.RotateTransition rotateCard = new javafx.animation.RotateTransition(Duration.millis(300), cardView);
-        rotateCard.setToAngle(-5 + (Math.random() * 10)); // Random angle for natural look
-        
-        // Play both animations in parallel
-        javafx.animation.ParallelTransition animation = new javafx.animation.ParallelTransition(moveCard, rotateCard);
-        
-        // When animation completes, update the UI
-        animation.setOnFinished(e -> {
-            // Remove the animated card
-            gamePane.getChildren().remove(cardView);
-            
-            // Update the discard pile
-            setupDiscardPile();
-        });
-        
-        // Start the animation
-        animation.play();
-    }
-    
-    /**
-     * Updates UNO indicators for all players based on their card count.
-     */
-    private void updateUnoIndicators() {
-        // Remove any existing UNO indicators first
-        removeExistingUnoIndicators();
-        
-        // Check each player's card count
-        List<Player> players = game.getPlayers();
-        for (int i = 0; i < players.size(); i++) {
-            Player player = players.get(i);
-            
-            // Show UNO indicator if player has exactly one card
-            if (player.getCardCount() == 1) {
-                switch (i) {
-                    case 0: // Human player (bottom)
-                        addUnoIndicatorToLabel(bottomPlayerNameLabel);
-                        break;
-                    case 1: // Top opponent
-                        addUnoIndicatorToLabel(topPlayerNameLabel);
-                        break;
-                    case 2: // Left opponent (if present)
-                        addUnoIndicatorToLabel(leftPlayerNameLabel);
-                        break;
-                    case 3: // Right opponent (if present)
-                        addUnoIndicatorToLabel(rightPlayerNameLabel);
-                        break;
-                }
-            }
-        }
-    }
-    
-    /**
-     * Removes any existing UNO indicator badges from all player name labels.
-     */
-    private void removeExistingUnoIndicators() {
-        // Remove graphics from all name labels
-        for (Label nameLabel : new Label[]{bottomPlayerNameLabel, topPlayerNameLabel, leftPlayerNameLabel, rightPlayerNameLabel}) {
-            if (nameLabel != null) {
-                // Remove the UNO indicator graphic
-                nameLabel.setGraphic(null);
-                nameLabel.setGraphicTextGap(0);
-                nameLabel.setContentDisplay(ContentDisplay.LEFT);
-            }
-        }
-    }
-    
-    /**
-     * Adds a UNO indicator badge DIRECTLY INSIDE the player name label.
-     * 
-     * @param nameLabel The name label to add the indicator to
-     */
-    private void addUnoIndicatorToLabel(Label nameLabel) {
-        if (nameLabel == null) return;
-        
-        // Create the UNO indicator as a StackPane
-        StackPane indicator = new StackPane();
-        indicator.setMaxWidth(30);
-        indicator.setMaxHeight(30);
-        indicator.setPrefWidth(30);
-        indicator.setPrefHeight(30);
-        
-        // Create the background circle
-        Circle badge = new Circle(15);
-        badge.setFill(Color.rgb(227, 35, 45)); // UNO red
-        badge.setStroke(Color.WHITE);
-        badge.setStrokeWidth(2);
-        
-        // Create the "UNO" text
-        Label unoText = new Label("UNO");
-        unoText.setTextFill(Color.WHITE);
-        unoText.setStyle("-fx-font-weight: bold; -fx-font-size: 10px;");
-        
-        // Add components to the indicator
-        indicator.getChildren().addAll(badge, unoText);
-        
-        // Add pulsing animation
-        ScaleTransition pulse = new ScaleTransition(Duration.millis(800), indicator);
-        pulse.setFromX(0.8);
-        pulse.setFromY(0.8);
-        pulse.setToX(1.2);
-        pulse.setToY(1.2);
-        pulse.setCycleCount(Animation.INDEFINITE);
-        pulse.setAutoReverse(true);
-        
-        // Set the indicator as the graphic of the name label
-        // Position depends on whether it's a side player or top/bottom player
-        if (nameLabel == leftPlayerNameLabel) {
-            nameLabel.setGraphic(indicator);
-            nameLabel.setGraphicTextGap(10);
-            nameLabel.setContentDisplay(ContentDisplay.RIGHT); // Add graphic to the right of text
-        } else if (nameLabel == rightPlayerNameLabel) {
-            nameLabel.setGraphic(indicator);
-            nameLabel.setGraphicTextGap(10);
-            nameLabel.setContentDisplay(ContentDisplay.LEFT); // Add graphic to the left of text
-        } else { // Top or bottom player
-            nameLabel.setGraphic(indicator);
-            nameLabel.setGraphicTextGap(10);
-            nameLabel.setContentDisplay(ContentDisplay.RIGHT); // Add graphic to the right of text
-        }
-        
-        // Start the animation
-        pulse.play();
-    }
-    
-    /**
-     * Adds a test button to trigger UNO indicator testing.
-     * This method is only for development/testing purposes.
-     */
-    private void addTestButton() {
-        Button testButton = new Button("Test UNO Indicators");
-        testButton.setLayoutX(10);
-        testButton.setLayoutY(10);
-        testButton.setStyle("-fx-background-color: #666; -fx-text-fill: white;");
-        
-        // Add click handler to test UNO indicators
-        testButton.setOnAction(event -> {
-            testUnoIndicators();
-        });
-        
-        // Add to game pane
-        gamePane.getChildren().add(testButton);
-    }
-    
-    /**
-     * Temporarily shows UNO indicators for all players to test positioning.
-     * This method is only for development/testing purposes.
-     */
-    private void testUnoIndicators() {
-        // First remove any existing indicators
-        removeExistingUnoIndicators();
-        
-        // Then add indicators for all player positions
-        addUnoIndicatorToLabel(bottomPlayerNameLabel);
-        addUnoIndicatorToLabel(topPlayerNameLabel);
-        
-        // Only add for side players if they're in the game
-        if (game.getPlayers().size() > 2) {
-            addUnoIndicatorToLabel(leftPlayerNameLabel);
-        }
-        
-        if (game.getPlayers().size() > 3) {
-            addUnoIndicatorToLabel(rightPlayerNameLabel);
-        }
-        
-        // Show a notification explaining the test
-        showActionNotification("TESTING", "UNO indicators shown for all players");
     }
 } 
