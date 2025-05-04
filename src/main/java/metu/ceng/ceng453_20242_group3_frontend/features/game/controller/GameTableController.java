@@ -33,6 +33,7 @@ public class GameTableController {
     
     // Add a field to store the game table animation
     private Timeline gameTableAnimation;
+    private Duration gameTableAnimationDuration;
     
     /**
      * Creates a new game table controller.
@@ -149,8 +150,10 @@ public class GameTableController {
         );
         
         pulseAnimation.setCycleCount(javafx.animation.Animation.INDEFINITE);
-        // Start paused - will be activated only for current player
-        pulseAnimation.pause();
+        
+        // Make sure the animation is stopped initially but not played
+        // This prevents a common JavaFX issue where animations get out of sync
+        pulseAnimation.stop();
         
         return pulseAnimation;
     }
@@ -165,19 +168,25 @@ public class GameTableController {
         
         // Stop all animations
         for (Timeline animation : playerAnimations) {
-            animation.pause();
+            animation.stop(); // Use stop() instead of pause() to fully reset
         }
         
-        // Stop game table animation
+        // Stop game table animation and reset it properly
         if (gameTableAnimation != null) {
-            gameTableAnimation.pause();
+            gameTableAnimation.stop(); // Use stop() instead of pause() to fully reset
         }
         
-        // Set basic shadow for all player areas
+        // Set basic shadow for all player areas to reset their appearance
         bottomPlayerArea.setEffect(new DropShadow(10, Color.rgb(0, 0, 0, 0.7)));
         topPlayerArea.setEffect(new DropShadow(10, Color.rgb(0, 0, 0, 0.7)));
         leftPlayerArea.setEffect(new DropShadow(10, Color.rgb(0, 0, 0, 0.7)));
         rightPlayerArea.setEffect(new DropShadow(10, Color.rgb(0, 0, 0, 0.7)));
+        
+        // Find the game table element and reset its appearance too
+        Node gameTable = findGameTable();
+        if (gameTable != null) {
+            gameTable.setEffect(new DropShadow(10, Color.rgb(0, 0, 0, 0.7)));
+        }
         
         // Determine which player area to animate based on player index and total players
         int currentPlayerIndex = game.getCurrentPlayerIndex();
@@ -185,34 +194,34 @@ public class GameTableController {
         
         if (currentPlayerIndex == 0) {
             // Human player (always at bottom)
-            playerAnimations[0].play();
+            playerAnimations[0].playFromStart(); // Use playFromStart() to ensure proper reset
             
-            // Also pulse the game table for human player
+            // Also pulse the game table for human player, properly synchronized
             if (gameTableAnimation != null) {
-                gameTableAnimation.play();
+                gameTableAnimation.playFromStart(); // Use playFromStart() for proper synchronization
             }
         } else {
             // AI player - which area depends on position in the new layout
             if (totalPlayers == 2) {
                 // 2 players: human at bottom, AI at top
                 if (currentPlayerIndex == 1) {
-                    playerAnimations[1].play(); // Top player
+                    playerAnimations[1].playFromStart(); // Top player
                 }
             } else if (totalPlayers == 3) {
                 // 3 players: human, right, top
                 if (currentPlayerIndex == 1) {
-                    playerAnimations[3].play(); // Right player (Opponent 1)
+                    playerAnimations[3].playFromStart(); // Right player (Opponent 1)
                 } else if (currentPlayerIndex == 2) {
-                    playerAnimations[1].play(); // Top player (Opponent 2)
+                    playerAnimations[1].playFromStart(); // Top player (Opponent 2)
                 }
             } else if (totalPlayers == 4) {
                 // 4 players: human, right, top, left
                 if (currentPlayerIndex == 1) {
-                    playerAnimations[3].play(); // Right player (Opponent 1)
+                    playerAnimations[3].playFromStart(); // Right player (Opponent 1)
                 } else if (currentPlayerIndex == 2) {
-                    playerAnimations[1].play(); // Top player (Opponent 2)
+                    playerAnimations[1].playFromStart(); // Top player (Opponent 2)
                 } else if (currentPlayerIndex == 3) {
-                    playerAnimations[2].play(); // Left player (Opponent 3)
+                    playerAnimations[2].playFromStart(); // Left player (Opponent 3)
                 }
             }
         }
