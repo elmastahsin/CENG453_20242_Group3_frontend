@@ -71,12 +71,6 @@
                 </font>
             </Button>
         </VBox>
-        
-        <!-- Debug section - Toggle visibility during development -->
-        <VBox fx:id="debugSection" alignment="CENTER" spacing="10.0" style="-fx-border-color: gray; -fx-border-radius: 5; -fx-padding: 10;">
-            <Label text="Debug Info" style="-fx-font-weight: bold;" />
-            <Label fx:id="tokenDebugLabel" text="Token info will appear here" wrapText="true" />
-            <Button fx:id="toggleDebugButton" text="Hide Debug Info" onAction="#toggleDebugInfo" styleClass="alt-button" />
-        </VBox>
+
     </VBox>
 </StackPane> 
