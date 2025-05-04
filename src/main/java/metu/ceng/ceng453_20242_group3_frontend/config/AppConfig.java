@@ -6,7 +6,7 @@ package metu.ceng.ceng453_20242_group3_frontend.config;
  */
 public class AppConfig {
     // API endpoints
-    public static final String BASE_API_URL = "http://localhost:8080/api";
+    public static final String BASE_API_URL = "https://ceng-453-group-3.onrender.com/api";
     
     // Authentication endpoints
     public static final String LOGIN_ENDPOINT = BASE_API_URL + "/auth/login";

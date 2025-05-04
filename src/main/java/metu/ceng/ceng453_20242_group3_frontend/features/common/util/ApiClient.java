@@ -15,7 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public class ApiClient {
     
-    private static final String API_BASE_URL = "http://localhost:8080/api";
+    private static final String API_BASE_URL = "https://ceng-453-group-3.onrender.com/api";
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     
