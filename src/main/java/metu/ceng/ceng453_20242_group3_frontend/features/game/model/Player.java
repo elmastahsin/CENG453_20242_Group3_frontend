@@ -11,6 +11,7 @@ public class Player {
     private final List<Card> hand;
     private boolean isAI;
     private boolean hasCalledUno;
+    private boolean shouldShowUnoIndicator;
 
     /**
      * Constructor for creating a player.
@@ -23,6 +24,7 @@ public class Player {
         this.hand = new ArrayList<>();
         this.isAI = isAI;
         this.hasCalledUno = false;
+        this.shouldShowUnoIndicator = false;
     }
 
     /**
@@ -53,6 +55,32 @@ public class Player {
     public void setHasCalledUno(boolean hasCalledUno) {
         this.hasCalledUno = hasCalledUno;
     }
+    
+    /**
+     * Checks if the UNO indicator should be displayed for this player.
+     * 
+     * @return true if the UNO indicator should be shown, false otherwise
+     */
+    public boolean shouldShowUnoIndicator() {
+        return shouldShowUnoIndicator;
+    }
+    
+    /**
+     * Updates whether the UNO indicator should be shown.
+     * Will automatically set to true if the player has exactly one card.
+     */
+    public void updateUnoIndicator() {
+        shouldShowUnoIndicator = (hand.size() == 1);
+    }
+    
+    /**
+     * Manually control the UNO indicator visibility.
+     * 
+     * @param show Whether to show the UNO indicator
+     */
+    public void setShouldShowUnoIndicator(boolean show) {
+        this.shouldShowUnoIndicator = show;
+    }
 
     /**
      * Adds a card to the player's hand.
@@ -65,7 +93,11 @@ public class Player {
         // Reset UNO declaration if player has more than 1 card
         if (hand.size() > 1) {
             hasCalledUno = false;
+            shouldShowUnoIndicator = false;
         }
+        
+        // Update UNO indicator
+        updateUnoIndicator();
     }
 
     /**
@@ -80,6 +112,11 @@ public class Player {
         // Reset UNO declaration if player has more than 1 card
         if (hand.size() > 1) {
             hasCalledUno = false;
+            shouldShowUnoIndicator = false;
+        } else if (hand.size() == 1) {
+            // Automatically call UNO when down to one card
+            hasCalledUno = true;
+            shouldShowUnoIndicator = true;
         }
         
         return removed;
@@ -101,6 +138,22 @@ public class Player {
      */
     public boolean shouldDeclareUno() {
         return hand.size() == 1 && !hasCalledUno;
+    }
+    
+    /**
+     * Automatically declares UNO for the player.
+     * This should be called when the player gets to one card.
+     * 
+     * @return true if UNO was declared, false if player already declared or doesn't have one card
+     */
+    public boolean declareUno() {
+        if (hand.size() != 1 || hasCalledUno) {
+            return false;
+        }
+        
+        hasCalledUno = true;
+        shouldShowUnoIndicator = true;
+        return true;
     }
 
     /**
