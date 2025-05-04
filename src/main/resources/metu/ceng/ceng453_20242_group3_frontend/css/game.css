@@ -5,12 +5,48 @@
 
 /* Game UI Styles */
 .game-background {
-    -fx-background-color: linear-gradient(to bottom right, #2c3e50, #4a69bd);
+    /* Modern UNO theme - vibrant with red, blue and yellow tones reflecting UNO cards */
+    -fx-background-color: linear-gradient(to bottom right, #1a2a6c, #b21f1f, #fdbb2d);
+    -fx-background-radius: 0;
 }
+
+/* Alternative backgrounds - uncomment one of these to use */
+
+/* Cool Blue Gradient - minimalistic and modern */
+/* 
+.game-background {
+    -fx-background-color: linear-gradient(to bottom right, #0f2027, #203a43, #2c5364);
+    -fx-background-radius: 0;
+}
+*/
+
+/* Royal Purple - elegant and modern */
+/* 
+.game-background {
+    -fx-background-color: linear-gradient(to bottom right, #24243e, #302b63, #0f0c29);
+    -fx-background-radius: 0;
+}
+*/
+
+/* Sunset Vibes - warm and energetic */
+/* 
+.game-background {
+    -fx-background-color: linear-gradient(to bottom right, #ff416c, #ff4b2b);
+    -fx-background-radius: 0;
+}
+*/
+
+/* Forest Green - calm and focused */
+/* 
+.game-background {
+    -fx-background-color: linear-gradient(to bottom right, #134e5e, #71b280);
+    -fx-background-radius: 0;
+}
+*/
 
 /* Enhanced Game Table Styling */
 .game-table {
-    -fx-background-color: radial-gradient(center 50% 50%, radius 100%, rgba(0, 100, 0, 0.8), rgba(0, 50, 0, 0.9));
+    -fx-background-color: radial-gradient(center 50% 50%, radius 100%, rgba(45, 52, 82, 0.8), rgba(26, 32, 53, 0.9));
     -fx-background-radius: 20;
     -fx-border-radius: 20;
     -fx-border-color: rgba(255, 255, 255, 0.5);
@@ -23,7 +59,7 @@
 
 .card-pile-area {
     -fx-padding: 20;
-    -fx-background-color: rgba(0, 0, 0, 0.3);
+    -fx-background-color: rgba(0, 0, 0, 0.4);
     -fx-background-radius: 15;
     -fx-effect: innershadow(gaussian, rgba(0, 0, 0, 0.5), 10, 0, 0, 0);
     -fx-border-color: rgba(255, 255, 255, 0.3);
@@ -241,7 +277,7 @@
 .turn-indicator {
     -fx-text-fill: white;
     -fx-font-weight: bold;
-    -fx-background-color: rgba(0, 153, 51, 0.8);
+    -fx-background-color: rgba(31, 58, 147, 0.8);
     -fx-background-radius: 20;
     -fx-padding: 8 25;
     -fx-font-size: 18px;
