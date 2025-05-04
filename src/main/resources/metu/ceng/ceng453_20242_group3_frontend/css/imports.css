@@ -16,4 +16,7 @@
 @import "game-mode.css";
 
 /* Import game styles */
-@import "game.css"; 
+@import "game.css";
+
+/* Import leaderboard styles */
+@import "leaderboard.css"; 

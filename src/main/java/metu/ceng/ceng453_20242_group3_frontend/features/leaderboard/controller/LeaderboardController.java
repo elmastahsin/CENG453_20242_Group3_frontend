@@ -25,9 +25,9 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import metu.ceng.ceng453_20242_group3_frontend.features.common.util.SessionManager;
 import metu.ceng.ceng453_20242_group3_frontend.features.leaderboard.model.LeaderboardEntry;
 import metu.ceng.ceng453_20242_group3_frontend.features.leaderboard.service.LeaderboardService;
-import metu.ceng.ceng453_20242_group3_frontend.features.common.util.SessionManager;
 
 /**
  * Controller for the leaderboard view.
@@ -98,31 +98,52 @@ public class LeaderboardController implements Initializable {
         // Initialize table column cell factories
         initializeTableColumns();
         
+        // Apply fade transition class
+        leaderboardPane.getStyleClass().add("fade-transition");
+        
         // Set up button actions
         refreshButton.setOnAction(event -> loadLeaderboardData());
         backButton.setOnAction(event -> navigateToMainMenu());
         
-        // Apply consistent styling to tables
-        applyTableStyling();
+        // Set keyboard event handler for ESC key
+        leaderboardPane.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                navigateToMainMenu();
+            }
+        });
+        
+        // Make sure the pane can receive focus
+        leaderboardPane.setFocusTraversable(true);
         
         // Set tab selection listener to highlight current user when tab changes
         leaderboardTabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
             int selectedIndex = leaderboardTabs.getSelectionModel().getSelectedIndex();
             switch (selectedIndex) {
                 case 0:
-                    highlightCurrentUser(weeklyTable);
+                    highlightCurrentUserAndTopRanks(weeklyTable);
                     break;
                 case 1:
-                    highlightCurrentUser(monthlyTable);
+                    highlightCurrentUserAndTopRanks(monthlyTable);
                     break;
                 case 2:
-                    highlightCurrentUser(allTimeTable);
+                    highlightCurrentUserAndTopRanks(allTimeTable);
                     break;
             }
         });
         
-        // Load initial data
-        loadLeaderboardData();
+        // Create fade-in animation for initial load
+        Platform.runLater(() -> {
+            FadeTransition fadeIn = new FadeTransition(Duration.millis(300), leaderboardPane);
+            fadeIn.setFromValue(0.0);
+            fadeIn.setToValue(1.0);
+            fadeIn.play();
+            
+            // Load initial data
+            loadLeaderboardData();
+            
+            // Request focus to enable keyboard navigation
+            leaderboardPane.requestFocus();
+        });
     }
     
     /**
@@ -152,19 +173,8 @@ public class LeaderboardController implements Initializable {
             new SimpleStringProperty(cellData.getValue().getUsername()));
         allTimeScoreColumn.setCellValueFactory(cellData -> 
             new SimpleIntegerProperty(cellData.getValue().getScore()).asObject());
-    }
-    
-    /**
-     * Applies consistent styling to all tables.
-     */
-    private void applyTableStyling() {
-        // Common table styles
-        String tableStyle = "-fx-background-color: white; -fx-border-color: #ccc;";
-        weeklyTable.setStyle(tableStyle);
-        monthlyTable.setStyle(tableStyle);
-        allTimeTable.setStyle(tableStyle);
-        
-        // Add CSS class for column alignment
+            
+        // Apply CSS classes for styling
         weeklyRankColumn.getStyleClass().add("rank-column");
         weeklyScoreColumn.getStyleClass().add("score-column");
         
@@ -174,44 +184,62 @@ public class LeaderboardController implements Initializable {
         allTimeRankColumn.getStyleClass().add("rank-column");
         allTimeScoreColumn.getStyleClass().add("score-column");
         
-        // Set center alignment for rank columns
-        weeklyRankColumn.setStyle("-fx-alignment: CENTER;");
-        monthlyRankColumn.setStyle("-fx-alignment: CENTER;");
-        allTimeRankColumn.setStyle("-fx-alignment: CENTER;");
-        
-        // Set right alignment for score columns
-        weeklyScoreColumn.setStyle("-fx-alignment: CENTER-RIGHT;");
-        monthlyScoreColumn.setStyle("-fx-alignment: CENTER-RIGHT;");
-        allTimeScoreColumn.setStyle("-fx-alignment: CENTER-RIGHT;");
-        
-        // Set row factory for zebra striping
-        weeklyTable.setRowFactory(tv -> createStyledRow());
-        monthlyTable.setRowFactory(tv -> createStyledRow());
-        allTimeTable.setRowFactory(tv -> createStyledRow());
+        // Set custom cell factories for rank styling
+        weeklyRankColumn.setCellFactory(column -> createRankCell());
+        monthlyRankColumn.setCellFactory(column -> createRankCell());
+        allTimeRankColumn.setCellFactory(column -> createRankCell());
     }
     
     /**
-     * Creates a styled table row with consistent styling.
-     * 
-     * @return A styled table row
+     * Creates a custom table cell for rank columns to apply special styling to top 3 ranks.
      */
-    private javafx.scene.control.TableRow<LeaderboardEntry> createStyledRow() {
-        javafx.scene.control.TableRow<LeaderboardEntry> row = new javafx.scene.control.TableRow<>();
-        row.itemProperty().addListener((obs, oldItem, newItem) -> {
-            // Simple border styling
-            row.setStyle("-fx-border-color: #eee; -fx-border-width: 0 0 1 0;");
-            
-            // If this row contains the current user, highlight it
-            if (newItem != null) {
-                String currentUsername = SessionManager.getInstance().getCurrentUser() != null ? 
-                    SessionManager.getInstance().getCurrentUser().getUsername() : null;
+    private javafx.scene.control.TableCell<LeaderboardEntry, Integer> createRankCell() {
+        return new javafx.scene.control.TableCell<>() {
+            @Override
+            protected void updateItem(Integer rank, boolean empty) {
+                super.updateItem(rank, empty);
                 
-                if (currentUsername != null && currentUsername.equals(newItem.getUsername())) {
-                    row.setStyle(row.getStyle() + "-fx-background-color: #e2f0ff;");
+                if (empty || rank == null) {
+                    setText(null);
+                    getStyleClass().removeAll("rank-1", "rank-2", "rank-3");
+                } else {
+                    setText(rank.toString());
+                    getStyleClass().removeAll("rank-1", "rank-2", "rank-3");
+                    
+                    // Apply special styling for top 3 ranks
+                    if (rank == 1) {
+                        getStyleClass().add("rank-1");
+                    } else if (rank == 2) {
+                        getStyleClass().add("rank-2");
+                    } else if (rank == 3) {
+                        getStyleClass().add("rank-3");
+                    }
                 }
             }
-        });
-        return row;
+        };
+    }
+    
+    /**
+     * Highlights the current user and applies special styling to top ranks in the given table.
+     */
+    private void highlightCurrentUserAndTopRanks(TableView<LeaderboardEntry> tableView) {
+        String currentUsername = SessionManager.getInstance().getCurrentUser() != null ? 
+            SessionManager.getInstance().getCurrentUser().getUsername() : null;
+            
+        if (currentUsername == null) {
+            return;
+        }
+        
+        for (int i = 0; i < tableView.getItems().size(); i++) {
+            LeaderboardEntry entry = tableView.getItems().get(i);
+            
+            // Check if this is the current user's row
+            if (entry.getUsername().equals(currentUsername)) {
+                tableView.getSelectionModel().select(i);
+                tableView.scrollTo(i);
+                break;
+            }
+        }
     }
     
     /**
@@ -237,7 +265,7 @@ public class LeaderboardController implements Initializable {
                     weeklyData -> {
                         Platform.runLater(() -> {
                             weeklyTable.setItems(FXCollections.observableArrayList(weeklyData));
-                            highlightCurrentUser(weeklyTable);
+                            highlightCurrentUserAndTopRanks(weeklyTable);
                         });
                     },
                     error -> {
@@ -252,7 +280,7 @@ public class LeaderboardController implements Initializable {
                     monthlyData -> {
                         Platform.runLater(() -> {
                             monthlyTable.setItems(FXCollections.observableArrayList(monthlyData));
-                            highlightCurrentUser(monthlyTable);
+                            highlightCurrentUserAndTopRanks(monthlyTable);
                         });
                     },
                     error -> {
@@ -267,9 +295,9 @@ public class LeaderboardController implements Initializable {
                     allTimeData -> {
                         Platform.runLater(() -> {
                             allTimeTable.setItems(FXCollections.observableArrayList(allTimeData));
-                            highlightCurrentUser(allTimeTable);
+                            highlightCurrentUserAndTopRanks(allTimeTable);
                             
-                            // Hide loading indicator once all data is loaded
+                            // Hide loading indicator when all data is loaded
                             if (loadingIndicator != null) {
                                 loadingIndicator.setVisible(false);
                             }
@@ -279,8 +307,6 @@ public class LeaderboardController implements Initializable {
                     error -> {
                         Platform.runLater(() -> {
                             showAlert(Alert.AlertType.ERROR, "Error", "Failed to load all-time leaderboard: " + error);
-                            
-                            // Hide loading indicator on error
                             if (loadingIndicator != null) {
                                 loadingIndicator.setVisible(false);
                             }
@@ -298,27 +324,7 @@ public class LeaderboardController implements Initializable {
     }
     
     /**
-     * Highlights the current user in the leaderboard.
-     * 
-     * @param tableView The table to highlight the user in
-     */
-    private void highlightCurrentUser(TableView<LeaderboardEntry> tableView) {
-        String currentUsername = SessionManager.getInstance().getCurrentUser() != null ? 
-                SessionManager.getInstance().getCurrentUser().getUsername() : null;
-        
-        if (currentUsername != null) {
-            for (LeaderboardEntry entry : tableView.getItems()) {
-                if (entry.getUsername().equals(currentUsername)) {
-                    tableView.getSelectionModel().select(entry);
-                    tableView.scrollTo(entry);
-                    break;
-                }
-            }
-        }
-    }
-    
-    /**
-     * Navigates back to the main menu.
+     * Navigates to the main menu.
      */
     private void navigateToMainMenu() {
         try {
@@ -326,55 +332,45 @@ public class LeaderboardController implements Initializable {
             Parent root = loader.load();
             
             Scene scene = new Scene(root);
+            
             // Apply CSS styling
             URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
             
+            // Add the fade transition class
+            root.getStyleClass().add("fade-transition");
+            
             Stage stage = (Stage) leaderboardPane.getScene().getWindow();
+            stage.setScene(scene);
             
-            // Add keyboard shortcuts for full screen mode
-            scene.setOnKeyPressed(e -> {
-                if (e.getCode() == KeyCode.F11) {
-                    stage.setFullScreen(!stage.isFullScreen());
-                } else if (e.getCode() == KeyCode.ENTER && e.isAltDown()) {
-                    stage.setFullScreen(!stage.isFullScreen());
-                }
-            });
-            
-            // Set the new scene with a fade transition
-            FadeTransition fadeOut = new FadeTransition(Duration.millis(200), leaderboardPane);
-            fadeOut.setFromValue(1.0);
-            fadeOut.setToValue(0.0);
-            fadeOut.setOnFinished(e -> {
-                stage.setScene(scene);
-                
-                // Start the fade-in transition after scene is set
-                FadeTransition fadeIn = new FadeTransition(Duration.millis(200), root);
+            // Animate the fade in
+            Platform.runLater(() -> {
+                FadeTransition fadeIn = new FadeTransition(Duration.millis(300), root);
                 fadeIn.setFromValue(0.0);
                 fadeIn.setToValue(1.0);
                 fadeIn.play();
             });
-            fadeOut.play();
             
         } catch (IOException e) {
-            showAlert(Alert.AlertType.ERROR, "Navigation Error", "Failed to return to main menu: " + e.getMessage());
+            showAlert(Alert.AlertType.ERROR, "Navigation Error", 
+                      "Could not navigate to main menu: " + e.getMessage());
         }
     }
     
     /**
-     * Shows an alert dialog.
-     * 
-     * @param type The type of alert
-     * @param title The title of the alert
-     * @param message The message to display
+     * Shows an alert dialog with the given type, title, and message.
      */
     private void showAlert(Alert.AlertType type, String title, String message) {
         Alert alert = new Alert(type);
         alert.setTitle(title);
-        alert.setHeaderText(null);
+        alert.setHeaderText(null); // No header text
         alert.setContentText(message);
+        
+        // Apply CSS to dialog
+        alert.getDialogPane().getStyleClass().add("modern-alert-pane");
+        
         alert.showAndWait();
     }
 } 
