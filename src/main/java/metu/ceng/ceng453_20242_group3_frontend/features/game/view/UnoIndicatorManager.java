@@ -139,8 +139,8 @@ public class UnoIndicatorManager {
         
         // Add pulsing animation
         ScaleTransition pulse = new ScaleTransition(Duration.millis(800), indicator);
-        pulse.setFromX(0.8);
-        pulse.setFromY(0.8);
+        pulse.setFromX(1.1);
+        pulse.setFromY(1.1);
         pulse.setToX(1.2);
         pulse.setToY(1.2);
         pulse.setCycleCount(Animation.INDEFINITE);
