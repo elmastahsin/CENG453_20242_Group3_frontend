@@ -26,6 +26,9 @@ public class Game {
 
     // Track the current color for wild cards
     private CardColor currentColor;
+    
+    // Track stacked Draw Two cards for the stacking mechanic
+    private int drawTwoStack = 0;
 
     /**
      * Constructor for creating a new game.
@@ -47,6 +50,7 @@ public class Game {
         this.winner = null;
         this.random = new Random();
         this.currentColor = null;
+        this.drawTwoStack = 0;
 
         System.out.println("### GAME CREATED WITH DIRECTION: " + this.direction + " ###");
     }
@@ -150,6 +154,15 @@ public class Game {
         return winner;
     }
 
+    /**
+     * Gets the current Draw Two stack count.
+     * 
+     * @return The number of Draw Two cards in the current stack
+     */
+    public int getDrawTwoStackCount() {
+        return drawTwoStack;
+    }
+
     /* === Game state helper methods === */
 
     /**
@@ -182,23 +195,34 @@ public class Game {
         if (!isGameActive() || players.isEmpty()) {
             return;
         }
-
+        
         Player currentPlayer = getCurrentPlayer();
         Card topCard = discardPile.peekCard();
         CardColor currentGameColor = getCurrentColor();
-
+        
         System.out.println("Updating playable cards for " + currentPlayer.getName());
         System.out.println("Top card: " + topCard + ", Current color: " + currentGameColor);
+        
+        // Special case: If Draw Two stack is active, only Draw Two cards are playable
+        if (drawTwoStack > 0) {
+            for (Card card : currentPlayer.getHand()) {
+                // Only Draw Two cards are playable when responding to a Draw Two
+                    card.setPlayable(card.getAction() == CardAction.DRAW_TWO);
 
+            }
+            return;
+        }
+        
+        // Standard playability rules for normal game state
         // Special case: If no cards in discard pile yet
         if (topCard == null) {
             setAllCardsPlayableExceptWildDrawFour(currentPlayer);
             return;
         }
-
+        
         // Check if the player has any cards matching the current color
         boolean hasMatchingColorCard = checkForMatchingColorCards(currentPlayer, currentGameColor);
-
+        
         // Determine which cards are playable
         updateCardPlayability(currentPlayer, topCard, currentGameColor, hasMatchingColorCard);
     }
@@ -261,6 +285,14 @@ public class Game {
      */
     private boolean determineIfCardIsPlayable(Card card, Card topCard, CardColor currentColor,
             boolean hasMatchingColorCard) {
+        // Wild and Wild Draw Four cards have special playability rules
+
+        // Regular WILD cards can always be played, regardless of the current color or top card
+        if (card.getAction() == CardAction.WILD) {
+            System.out.println("WILD card is always playable: " + card);
+            return true;
+        }
+        
         // Wild Draw Four can only be played if the player has no matching color cards
         if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
             boolean playable = !hasMatchingColorCard;
@@ -268,12 +300,6 @@ public class Game {
                 System.out.println("WILD_DRAW_FOUR not playable - player has matching color cards: " + card);
             }
             return playable;
-        }
-
-        // Regular wild cards can always be played, regardless of the current color
-        if (card.getAction() == CardAction.WILD) {
-            System.out.println("WILD card is always playable: " + card);
-            return true;
         }
 
         // Cards matching the current color can be played
@@ -292,6 +318,12 @@ public class Game {
         if (topCard.isActionCard() && card.isActionCard() && topCard.getAction() == card.getAction()
                 && !card.isWildCard() && !topCard.isWildCard()) {
             System.out.println("Card matches top card action (" + topCard.getAction() + "): " + card);
+            return true;
+        }
+
+        // Special case for Draw Two during stacking
+        if (drawTwoStack > 0 && card.getAction() == CardAction.DRAW_TWO) {
+            System.out.println("Draw Two played during stacking (no color restriction): " + card);
             return true;
         }
 
@@ -355,6 +387,7 @@ public class Game {
      * Deals initial cards to all players.
      */
     private void dealInitialCards() {
+        // dealInitialCardsForStacking();
         for (int i = 0; i < AppConfig.INITIAL_CARDS_PER_PLAYER; i++) {
             for (Player player : players) {
                 Card card = drawPile.drawCard();
@@ -364,6 +397,13 @@ public class Game {
             }
         }
     }
+
+    // private void dealInitialCardsForStacking() {
+    //     players.get(0).addCard(new Card(CardColor.RED, CardAction.DRAW_TWO));
+    //     players.get(0).addCard(new Card(CardColor.YELLOW, CardAction.DRAW_TWO));
+    //     players.get(1).addCard(new Card(CardColor.BLUE, CardAction.DRAW_TWO));
+    // }
+
 
     /**
      * Moves to the next player in turn.
@@ -452,14 +492,20 @@ public class Game {
             return false;
         }
 
-        updatePlayableCards();
+        // Special handling for Draw Two stacking
+        boolean isDrawTwoResponse = drawTwoStack > 0 && card.getAction() == CardAction.DRAW_TWO;
+        
+        if (!isDrawTwoResponse) {
+            // Only update playable cards in normal situations (not during Draw Two stacking)
+            updatePlayableCards();
+        }
 
         // Check if the card is playable
-        if (!card.isPlayable()) {
+        if (!card.isPlayable() && !isDrawTwoResponse) {
             System.out.println("Card is not playable: " + card);
             return false;
         }
-
+        
         // Remove the card from player's hand and add to discard pile
         if (!currentPlayer.removeCard(card)) {
             return false;
@@ -530,6 +576,15 @@ public class Game {
                 ", Current color: " + currentColor +
                 ", Current player: " + getCurrentPlayer().getName());
 
+        // If this is not a Draw Two card, reset the stack counter
+        // since the chain is broken
+        if (card.getAction() != CardAction.DRAW_TWO) {
+            if (drawTwoStack > 0) {
+                System.out.println("Draw Two stack reset (was " + drawTwoStack + ")");
+                drawTwoStack = 0;
+            }
+        }
+
         // If it's a number card or a wild card without draw, just move to the next
         // player
         if (card.isNumberCard() || card.getAction() == CardAction.WILD) {
@@ -599,16 +654,78 @@ public class Game {
      * Handles a Draw Two card action.
      */
     private void handleDrawTwoCard() {
+        // Increment the draw two stack counter
+        drawTwoStack += 1;
+        
         Player nextPlayer = nextPlayer();
-        System.out.println("Draw Two: Next player " + nextPlayer.getName() + " will draw 2 cards");
-
-        // Draw two cards for the next player
-        drawCardsForPlayer(nextPlayer, 2);
-
-        // Skip the player who drew cards
-        Player skippedPlayer = nextPlayer();
-        System.out.println("Skipped player " + nextPlayer.getName() +
-                ", new current player: " + skippedPlayer.getName());
+        System.out.println("Draw Two played, stack is now: " + drawTwoStack + " - Next player: " + nextPlayer.getName());
+        
+        // Check if the next player has a Draw Two card they can play in response
+        boolean canRespond = checkForDrawTwoResponse(nextPlayer);
+        
+        if (!canRespond) {
+            // If the player can't respond, they draw cards based on the stack size
+            int cardsToDraw = drawTwoStack * 2;
+            System.out.println("Player " + nextPlayer.getName() + " must draw " + cardsToDraw + " cards");
+            
+            // Draw the stacked cards
+            drawCardsForPlayer(nextPlayer, cardsToDraw);
+            
+            // Reset the draw two stack
+            drawTwoStack = 0;
+            
+            // Skip the player who drew cards
+            Player skippedPlayer = nextPlayer();
+            System.out.println("Skipped player " + nextPlayer.getName() + 
+                    ", new current player: " + skippedPlayer.getName());
+        }
+        // If they can respond, we don't do anything - the stack will continue to increase
+        // when they play their Draw Two card in their turn
+    }
+    
+    /**
+     * Checks if a player has a Draw Two card they can play in response to a stacked Draw Two.
+     * This only applies to AI players - human players will manually select their card.
+     * 
+     * @param player The player to check
+     * @return true if the player can respond with a Draw Two, false otherwise
+     */
+    private boolean checkForDrawTwoResponse(Player player) {
+        // Only AI players should automatically respond - human players will choose manually
+        if (!player.isAI()) {
+            updatePlayableCards();
+            
+            // For human players, we'll update card playability to show only Draw Two cards
+            // as playable, but we won't automatically respond
+            for (Card card : player.getHand()) {
+                // Only Draw Two cards are playable when responding to a Draw Two
+                card.setPlayable(card.getAction() == CardAction.DRAW_TWO);
+            }
+            
+            // Return if they have any Draw Two card, but don't play it automatically
+            boolean hasDrawTwo = player.hasPlayableCards();
+            System.out.println("Human player " + player.getName() + 
+                    (hasDrawTwo ? " has a Draw Two card they can play" : " has no Draw Two cards"));
+            return hasDrawTwo;
+        }
+        
+        // For AI players, check if they have a Draw Two card - no color restriction
+        boolean hasDrawTwo = false;
+        for (Card card : player.getHand()) {
+            if (card.getAction() == CardAction.DRAW_TWO) {
+                // Found a Draw Two card, but don't play it yet - AI will play it in their turn
+                hasDrawTwo = true;
+                break;
+            }
+        }
+        
+        if (hasDrawTwo) {
+            System.out.println("AI player " + player.getName() + " has a Draw Two card they can play on their turn");
+        } else {
+            System.out.println("AI player " + player.getName() + " has no Draw Two cards to respond with");
+        }
+        
+        return hasDrawTwo;
     }
 
     /**
@@ -711,6 +828,9 @@ public class Game {
      * Draws a card for the current player without advancing the turn.
      * This is useful for human players when we want to check if the drawn card is
      * playable before deciding whether to advance the turn.
+     * 
+     * Special handling for Draw Two stacking - if drawTwoStack > 0, this will draw
+     * all the required cards (2 × stack size).
      *
      * @return The drawn card, or null if no card could be drawn
      */
@@ -720,7 +840,33 @@ public class Game {
         if (!isGameActive()) {
             return null;
         }
-
+        
+        // Special handling for Draw Two stacking
+        if (drawTwoStack > 0) {
+            // Calculate total cards to draw (2 × stack size)
+            int cardsToDraw = drawTwoStack * 2;
+            System.out.println("Player " + currentPlayer.getName() + " is drawing " + 
+                    cardsToDraw + " cards due to stacked Draw Two");
+            
+            // Draw all the required cards
+            for (int i = 0; i < cardsToDraw; i++) {
+                Card stackCard = drawCard();
+                if (stackCard != null) {
+                    currentPlayer.addCard(stackCard);
+                }
+            }
+            
+            // Reset the stack
+            drawTwoStack = 0;
+            
+            // Update playable status of cards
+            updatePlayableCards();
+            
+            // Return the last drawn card (for UI feedback)
+            return currentPlayer.getHand().get(currentPlayer.getHand().size() - 1);
+        }
+        
+        // Normal drawing (single card)
         Card card = drawCard();
         if (card != null) {
             currentPlayer.addCard(card);
@@ -743,6 +889,11 @@ public class Game {
      * card.
      */
     public void advanceTurnAfterDraw() {
+        // If we had a Draw Two stack, we should reset it after the player draws
+        if (drawTwoStack > 0) {
+            drawTwoStack = 0;
+        }
+        
         nextPlayer();
         updatePlayableCards();
     }
@@ -766,15 +917,15 @@ public class Game {
         sb.append("Discard Pile: ").append(discardPile.getSize()).append(" cards\n");
         sb.append("Top Card: ").append(discardPile.peekCard()).append("\n");
         sb.append("Players: \n");
-
+        
         for (Player player : players) {
             sb.append("  - ").append(player.toString()).append("\n");
         }
-
+        
         if (gameEnded && winner != null) {
             sb.append("Winner: ").append(winner.getName()).append("\n");
         }
-
+        
         return sb.toString();
     }
 }

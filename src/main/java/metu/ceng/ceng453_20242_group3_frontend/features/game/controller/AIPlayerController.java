@@ -134,7 +134,46 @@ public class AIPlayerController {
         
         // Make sure playable cards are up-to-date
         game.updatePlayableCards();
+
+        // Special case for Draw Two stacking - prioritize playing Draw Two if in a stack
+        if (game.getDrawTwoStackCount() > 0) {
+            // Look for a Draw Two card to play
+            Card drawTwoCard = findDrawTwoCard(aiPlayer.getHand());
+            if (drawTwoCard != null) {
+                System.out.println("AI is responding to Draw Two with another Draw Two: " + drawTwoCard);
+                
+                // Play the card with a delay
+                final Card selectedCard = drawTwoCard;
+                PauseTransition pause = new PauseTransition(Duration.millis(2000));
+                pause.setOnFinished(e -> playAICard(aiIndex, selectedCard));
+                pause.play();
+                return;
+            }
+            
+            // If no Draw Two card available, AI will draw the stacked cards
+            System.out.println("AI has no Draw Two to respond with, will draw stacked cards");
+            PauseTransition pause = new PauseTransition(Duration.millis(2000));
+            pause.setOnFinished(e -> {
+                // Draw cards without advancing turn - will handle the accumulated stack
+                Card drawnCard = game.drawCardWithoutAdvancingTurn();
+                
+                // The turn is automatically advanced and player is skipped in handleDrawTwoCard
+                cardPlayCallback.onCardDrawn();
+                
+                // Notify about drawing stacked cards
+                notificationManager.showActionNotification(aiPlayer.getName(), 
+                        "drew " + (game.getDrawTwoStackCount() * 2) + " cards and was skipped");
+                
+                // Continue game flow
+                if (game.getCurrentPlayer().isAI()) {
+                    handleAITurns();
+                }
+            });
+            pause.play();
+            return;
+        }
         
+        // Normal AI turn logic (for non-stacking situations)
         // Check if AI should draw or play
         if (aiInstance.shouldDraw(aiPlayer.getHand())) {
             System.out.println("AI has no playable cards, will draw a card");
@@ -178,6 +217,21 @@ public class AIPlayerController {
             });
             pause.play();
         }
+    }
+
+    /**
+     * Finds a Draw Two card in the player's hand
+     * 
+     * @param hand The player's hand of cards
+     * @return A Draw Two card if found, null otherwise
+     */
+    private Card findDrawTwoCard(List<Card> hand) {
+        for (Card card : hand) {
+            if (card.getAction() == CardAction.DRAW_TWO) {
+                return card;
+            }
+        }
+        return null;
     }
 
     /**
