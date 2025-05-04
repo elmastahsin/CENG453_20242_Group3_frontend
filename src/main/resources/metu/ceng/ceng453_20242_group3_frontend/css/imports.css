@@ -1,0 +1,19 @@
+/* 
+ * Main CSS imports file for UNO Game
+ * This file imports all the other CSS files and serves as the main entry point
+ */
+
+/* Import base styles */
+@import "base.css";
+
+/* Import authentication styles */
+@import "auth.css";
+
+/* Import menu styles */
+@import "menu.css";
+
+/* Import game mode selection styles */
+@import "game-mode.css";
+
+/* Import game styles */
+@import "game.css"; 

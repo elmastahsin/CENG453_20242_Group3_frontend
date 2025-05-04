@@ -3,140 +3,158 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ListView?>
-<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.shape.Circle?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.text.Font?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.shape.Circle?>
 
-<BorderPane fx:id="gamePane" prefHeight="768.0" prefWidth="1024.0" styleClass="game-background" 
-            xmlns="http://javafx.com/javafx" 
-            xmlns:fx="http://javafx.com/fxml" 
-            fx:controller="metu.ceng.ceng453_20242_group3_frontend.controller.GameController">
-    
-    <!-- Top section with opponent info -->
-    <top>
-        <VBox alignment="CENTER" spacing="10.0">
-            <Label fx:id="opponentNameLabel" styleClass="player-name-label" text="Computer 2">
-                <font>
-                    <Font size="18.0" />
-                </font>
-            </Label>
-            <HBox fx:id="opponentCardsContainer" alignment="CENTER" spacing="-25.0" styleClass="opponent-cards-container">
-                <!-- Cards will be added programmatically -->
-            </HBox>
-            <padding>
-                <Insets bottom="10.0" top="20.0" />
-            </padding>
-        </VBox>
-    </top>
-    
-    <!-- Left section with computer 1 -->
-    <left>
-        <VBox alignment="CENTER" spacing="10.0" styleClass="player-area">
-            <Label text="Computer 1" styleClass="player-name-label">
-                <font>
-                    <Font size="16.0" />
-                </font>
-            </Label>
-            <VBox fx:id="leftPlayerCardsContainer" alignment="CENTER" spacing="-15.0" styleClass="opponent-cards-container">
-                <!-- Cards will be added programmatically -->
-            </VBox>
-            
-            <Button fx:id="quitButton" text="QUIT" styleClass="quit-button">
-                <VBox.margin>
-                    <Insets top="20.0" />
-                </VBox.margin>
+<AnchorPane fx:id="gamePane" xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" 
+            fx:controller="metu.ceng.ceng453_20242_group3_frontend.features.game.controller.GameController"
+            styleClass="game-background">
+
+    <!-- Main Game Grid - 3x3 Grid Layout -->
+    <GridPane AnchorPane.topAnchor="0.0" AnchorPane.rightAnchor="0.0" 
+              AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
+              hgap="10" vgap="10" alignment="CENTER">
+        
+        <!-- Define column constraints for responsive sizing -->
+        <columnConstraints>
+            <ColumnConstraints hgrow="SOMETIMES" percentWidth="25.0" />
+            <ColumnConstraints hgrow="SOMETIMES" percentWidth="50.0" />
+            <ColumnConstraints hgrow="SOMETIMES" percentWidth="25.0" />
+        </columnConstraints>
+        
+        <!-- Define row constraints for responsive sizing -->
+        <rowConstraints>
+            <RowConstraints vgrow="SOMETIMES" percentHeight="25.0" />
+            <RowConstraints vgrow="SOMETIMES" percentHeight="50.0" />
+            <RowConstraints vgrow="SOMETIMES" percentHeight="25.0" />
+        </rowConstraints>
+        
+        <!-- Top/Header Row -->
+        <!-- Exit Button (top-right) -->
+        <HBox alignment="TOP_RIGHT" GridPane.columnIndex="2" GridPane.rowIndex="0">
+            <Button fx:id="exitGameButton" text="EXIT GAME" styleClass="quit-button">
+                <HBox.margin>
+                    <Insets top="10" right="10" />
+                </HBox.margin>
             </Button>
-            
-            <padding>
-                <Insets bottom="10.0" left="20.0" right="15.0" top="10.0" />
-            </padding>
+        </HBox>
+        
+        <!-- Top Player (Opponent 1) -->
+        <VBox fx:id="topPlayerArea" alignment="CENTER" styleClass="player-area" 
+              GridPane.columnIndex="1" GridPane.rowIndex="0">
+            <Label fx:id="topPlayerNameLabel" styleClass="player-name-label" id="topPlayerLabel" text="Opponent 1" />
+            <HBox fx:id="topPlayerCardsContainer" alignment="CENTER" spacing="-25.0" 
+                  styleClass="opponent-cards-container" />
         </VBox>
-    </left>
-    
-    <!-- Right section with computer 3 -->
-    <right>
-        <VBox alignment="CENTER" spacing="10.0" styleClass="player-area">
-            <Label text="Computer 3" styleClass="player-name-label">
-                <font>
-                    <Font size="16.0" />
-                </font>
-            </Label>
-            <VBox fx:id="rightPlayerCardsContainer" alignment="CENTER" spacing="-15.0" styleClass="opponent-cards-container">
-                <!-- Cards will be added programmatically -->
+        
+        <!-- Middle Row -->
+        <!-- Left Player (Opponent 2) -->
+        <HBox fx:id="leftPlayerArea" alignment="CENTER" styleClass="player-area" 
+              GridPane.columnIndex="0" GridPane.rowIndex="1">
+            <VBox fx:id="leftPlayerCardsContainer" id="leftPlayerCardsContainer" alignment="CENTER" spacing="-15.0" 
+                  styleClass="opponent-cards-container" HBox.hgrow="ALWAYS" />
+            <!-- Opponent 2 Name Container - positioned to the right of cards -->
+            <VBox alignment="CENTER" styleClass="side-opponent-name-container">
+                <Label fx:id="leftPlayerNameLabel" styleClass="player-name-label" id="leftPlayerLabel" text="Opponent 2" />
             </VBox>
-            
-            <padding>
-                <Insets bottom="10.0" left="15.0" right="20.0" top="10.0" />
-            </padding>
-        </VBox>
-    </right>
-    
-    <!-- Center game area -->
-    <center>
-        <StackPane alignment="CENTER">
-            <!-- Turn indicator -->
-            <Label fx:id="turnIndicatorLabel" styleClass="turn-indicator" text="ruchan (You)" translateY="250.0">
-                <font>
-                    <Font size="18.0" />
-                </font>
-            </Label>
-            
-            <!-- Draw and discard piles -->
-            <HBox alignment="CENTER" spacing="30.0">
-                <!-- Current card at center -->
-                <StackPane fx:id="currentCardContainer" styleClass="card-container">
-                    <ImageView fitHeight="120.0" fitWidth="80.0" pickOnBounds="true" preserveRatio="true">
-                        <Image url="@../../../images/card-9-red.png" />
-                    </ImageView>
-                </StackPane>
+        </HBox>
+        
+        <!-- Game Table (Center) -->
+        <StackPane GridPane.columnIndex="1" GridPane.rowIndex="1" alignment="CENTER">
+            <!-- Game Table Background -->
+            <StackPane styleClass="game-table" alignment="CENTER">
+                <!-- Decorative Corner Elements -->
+                <AnchorPane pickOnBounds="false">
+                    <!-- Top-Left Corner -->
+                    <Circle radius="15" fill="rgba(255, 255, 255, 0.3)" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="2"
+                            AnchorPane.topAnchor="10.0" AnchorPane.leftAnchor="10.0"/>
+                    
+                    <!-- Top-Right Corner -->
+                    <Circle radius="15" fill="rgba(255, 255, 255, 0.3)" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="2"
+                            AnchorPane.topAnchor="10.0" AnchorPane.rightAnchor="10.0"/>
+                    
+                    <!-- Bottom-Left Corner -->
+                    <Circle radius="15" fill="rgba(255, 255, 255, 0.3)" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="2"
+                            AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="10.0"/>
+                    
+                    <!-- Bottom-Right Corner -->
+                    <Circle radius="15" fill="rgba(255, 255, 255, 0.3)" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="2"
+                            AnchorPane.bottomAnchor="10.0" AnchorPane.rightAnchor="10.0"/>
+                </AnchorPane>
                 
-                <!-- Draw pile -->
-                <StackPane fx:id="drawPileContainer" styleClass="card-container">
-                    <ImageView fitHeight="120.0" fitWidth="80.0" pickOnBounds="true" preserveRatio="true">
-                        <Image url="@../../../images/card-back.png" />
+                <!-- Game Deck and Pile -->
+                <VBox alignment="CENTER" spacing="25">
+                    <!-- UNO Logo at the top of table -->
+                    <ImageView fitHeight="60.0" fitWidth="120.0" pickOnBounds="true" preserveRatio="true" styleClass="game-logo">
+                        <Image url="@../../../images/CengUnoLogo.png" />
                     </ImageView>
-                </StackPane>
-            </HBox>
-            
-            <!-- Direction indicators -->
-            <ImageView fx:id="directionIndicator" fitHeight="60.0" fitWidth="60.0" pickOnBounds="true" preserveRatio="true" styleClass="direction-indicator" translateY="0.0">
-                <Image url="@../../../images/arrow-clockwise.png" />
-            </ImageView>
-            
-            <!-- Color indicator -->
-            <Circle fx:id="colorIndicator" radius="30.0" fill="RED" translateX="-140.0" />
+                    
+                    <!-- Card Piles Container -->
+                    <HBox alignment="CENTER" spacing="60.0" styleClass="card-pile-area">
+                        <!-- Draw pile -->
+                        <StackPane fx:id="drawPileContainer" styleClass="card-container, draw-pile">
+                            <ImageView fitHeight="140.0" fitWidth="100.0" pickOnBounds="true" preserveRatio="true">
+                                <Image url="@../../../images/card-back.png" />
+                            </ImageView>
+                            <Label text="DRAW PILE" styleClass="card-pile-label"/>
+                        </StackPane>
+                        
+                        <!-- Discard pile -->
+                        <StackPane fx:id="discardPileContainer" styleClass="card-container, discard-pile" id="discard-pile">
+                            <ImageView fitHeight="140.0" fitWidth="100.0" pickOnBounds="true" preserveRatio="true">
+                                <Image url="@../../../images/card-9-red.png" />
+                            </ImageView>
+                            <Label text="DISCARD PILE" styleClass="card-pile-label"/>
+                        </StackPane>
+                    </HBox>
+                    
+                    <!-- Current Turn Label -->
+                    <Label fx:id="currentTurnLabel" text="YOUR TURN" styleClass="turn-indicator"/>
+                </VBox>
+            </StackPane>
         </StackPane>
-    </center>
-    
-    <!-- Bottom section with player cards and game actions -->
-    <bottom>
-        <VBox alignment="CENTER" spacing="15.0">
-            <!-- Game action buttons -->
-            <HBox alignment="CENTER" spacing="10.0">
-                <Button fx:id="reverseButton" styleClass="action-button, reverse-button" text="Reverse" />
-                <Button fx:id="skipButton" styleClass="action-button, skip-button" text="Skip" />
-                <Button fx:id="drawTwoButton" styleClass="action-button, draw-button" text="Draw Two" />
-                <Button fx:id="wildButton" styleClass="action-button, wild-button" text="Wild" />
-                <Button fx:id="wildDrawFourButton" styleClass="action-button, wild-button" text="Wild Draw Four" />
-            </HBox>
-            
-            <!-- Player cards -->
-            <HBox fx:id="playerCardsContainer" alignment="CENTER" spacing="-25.0" styleClass="player-cards-container">
-                <!-- Cards will be added programmatically -->
-            </HBox>
-            
-            <padding>
-                <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
-            </padding>
+        
+        <!-- Right Player (Opponent 3) -->
+        <HBox fx:id="rightPlayerArea" alignment="CENTER" styleClass="player-area" 
+              GridPane.columnIndex="2" GridPane.rowIndex="1">
+            <!-- Opponent 3 Name Container - positioned to the left of cards -->
+            <VBox alignment="CENTER" styleClass="side-opponent-name-container">
+                <Label fx:id="rightPlayerNameLabel" styleClass="player-name-label" id="rightPlayerLabel" text="Opponent 3" />
+            </VBox>
+            <VBox fx:id="rightPlayerCardsContainer" id="rightPlayerCardsContainer" alignment="CENTER" spacing="-15.0" 
+                  styleClass="opponent-cards-container" HBox.hgrow="ALWAYS" />
+        </HBox>
+        
+        <!-- Bottom Row - Player -->
+        <VBox fx:id="bottomPlayerArea" alignment="CENTER" styleClass="player-area" 
+              GridPane.columnIndex="1" GridPane.rowIndex="2">
+            <HBox fx:id="bottomPlayerCardsContainer" alignment="CENTER" spacing="-25.0" 
+                  styleClass="player-cards-container" />
+            <Label fx:id="bottomPlayerNameLabel" styleClass="player-name-label" text="Your Username" />
         </VBox>
-    </bottom>
-    
-</BorderPane> 
+
+        <!-- Direction indicator at bottom right -->
+        <VBox alignment="CENTER_RIGHT" GridPane.columnIndex="2" GridPane.rowIndex="2">
+            <HBox alignment="CENTER" styleClass="direction-container">
+                <Label text="Direction:" styleClass="direction-text" />
+                <ImageView fx:id="directionIndicator" fitHeight="40.0" fitWidth="40.0" 
+                           pickOnBounds="true" preserveRatio="true" styleClass="direction-indicator">
+                    <Image url="@../../../images/arrow-clockwise.png" />
+                </ImageView>
+                <VBox.margin>
+                    <Insets right="20" bottom="20" />
+                </VBox.margin>
+            </HBox>
+        </VBox>
+    </GridPane>
+</AnchorPane> 

@@ -1,0 +1,364 @@
+/* 
+ * Game styles for UNO Game
+ * Contains styles for game UI, cards, players and game actions
+ */
+
+/* Game UI Styles */
+.game-background {
+    -fx-background-color: linear-gradient(to bottom right, #2c3e50, #4a69bd);
+}
+
+/* Enhanced Game Table Styling */
+.game-table {
+    -fx-background-color: radial-gradient(center 50% 50%, radius 100%, rgba(0, 100, 0, 0.8), rgba(0, 50, 0, 0.9));
+    -fx-background-radius: 20;
+    -fx-border-radius: 20;
+    -fx-border-color: rgba(255, 255, 255, 0.5);
+    -fx-border-width: 4;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.7), 15, 0, 0, 0);
+    -fx-padding: 20;
+    -fx-border-insets: 10;
+    -fx-background-insets: 10;
+}
+
+.card-pile-area {
+    -fx-padding: 20;
+    -fx-background-color: rgba(0, 0, 0, 0.3);
+    -fx-background-radius: 15;
+    -fx-effect: innershadow(gaussian, rgba(0, 0, 0, 0.5), 10, 0, 0, 0);
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+    -fx-border-width: 2;
+    -fx-border-radius: 15;
+}
+
+/* Enhanced Card Pile Styling */
+.draw-pile {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 10, 0, 0, 0);
+    -fx-cursor: hand;
+    -fx-background-color: rgba(0, 0, 0, 0.2);
+    -fx-background-radius: 10;
+    -fx-padding: 5;
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+    -fx-border-width: 2;
+    -fx-border-radius: 10;
+}
+
+.draw-pile:hover {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.8), 15, 0, 0, 0);
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
+    -fx-transition: all 0.3s ease;
+}
+
+.discard-pile {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 10, 0, 0, 0);
+    -fx-background-color: rgba(0, 0, 0, 0.2);
+    -fx-background-radius: 10;
+    -fx-padding: 5;
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+    -fx-border-width: 2;
+    -fx-border-radius: 10;
+    -fx-cursor: hand;
+}
+
+.discard-pile:hover {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.8), 15, 0, 0, 0);
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
+    -fx-transition: all 0.3s ease;
+}
+
+.game-logo {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.7), 10, 0, 0, 2);
+}
+
+.player-name-label {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 16px;
+    -fx-background-color: rgba(0, 0, 0, 0.7);
+    -fx-background-radius: 20;
+    -fx-padding: 8 20;
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.3), 6, 0, 0, 2);
+    -fx-text-alignment: center;
+}
+
+#topPlayerLabel {
+    -fx-rotate: 180;
+}
+
+.player-area {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-background-radius: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 8, 0, 0, 2);
+    -fx-alignment: center;
+    -fx-padding: 10;
+    -fx-spacing: 10;
+}
+
+.uno-card {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 5, 0, 0, 2);
+    -fx-cursor: hand;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+}
+
+.uno-card:hover {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.8), 8, 0, 0, 0);
+}
+
+.card-back {
+    -fx-background-color: #000000;
+    -fx-background-radius: 10;
+}
+
+.card-container {
+    -fx-background-radius: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 5, 0, 0, 3);
+}
+
+.card-container:hover {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.8), 8, 0, 0, 0);
+}
+
+.player-cards-container {
+    -fx-padding: 10;
+    -fx-spacing: -25;
+    -fx-alignment: center;
+    -fx-min-height: 120px;
+}
+
+.opponent-cards-container {
+    -fx-padding: 10;
+    -fx-spacing: -40;
+    -fx-alignment: center;
+    -fx-min-height: 100px;
+}
+
+/* Side player containers need different spacing for rotated cards */
+#leftPlayerCardsContainer, #rightPlayerCardsContainer {
+    -fx-spacing: -50;
+    -fx-min-height: 200px;
+    -fx-min-width: 120px;
+    -fx-padding: 15;
+}
+
+.action-buttons-container {
+    -fx-padding: 15px;
+    -fx-background-color: rgba(0, 0, 0, 0.4);
+    -fx-background-radius: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 5, 0, 0, 2);
+}
+
+.action-button {
+    -fx-min-width: 120px;
+    -fx-min-height: 45px;
+    -fx-background-color: rgba(255, 255, 255, 0.8);
+    -fx-text-fill: #333333;
+    -fx-font-weight: bold;
+    -fx-background-radius: 10;
+    -fx-font-size: 14px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 5, 0, 0, 2);
+}
+
+.action-button:hover {
+    -fx-background-color: white;
+}
+
+.wild-button {
+    -fx-background-color: linear-gradient(to right, #ff5e5e, #ffce54, #a0d468, #4fc1e9);
+}
+
+.draw-button {
+    -fx-background-color: #ff6b6b;
+    -fx-text-fill: white;
+}
+
+.skip-button {
+    -fx-background-color: #f1c40f;
+}
+
+.reverse-button {
+    -fx-background-color: #3498db;
+    -fx-text-fill: white;
+}
+
+/* Game UI elements */
+.sidebar {
+    -fx-background-color: rgba(0, 0, 0, 0.5);
+    -fx-background-radius: 15;
+    -fx-min-width: 230px;
+    -fx-max-width: 230px;
+    -fx-padding: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 5, 0, 0, 2);
+}
+
+.sidebar-header {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 8 0;
+    -fx-font-size: 16px;
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+    -fx-border-width: 0 0 1 0;
+}
+
+.chat-scroll-pane {
+    -fx-background: transparent;
+    -fx-background-color: rgba(0, 0, 0, 0.2);
+    -fx-background-radius: 10;
+    -fx-min-height: 200px;
+}
+
+.chat-scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.chat-messages-container {
+    -fx-background-color: transparent;
+    -fx-padding: 10;
+}
+
+.chat-message {
+    -fx-text-fill: white;
+    -fx-padding: 8;
+    -fx-background-color: rgba(0, 0, 0, 0.4);
+    -fx-background-radius: 10;
+    -fx-font-size: 12px;
+}
+
+.send-button {
+    -fx-background-color: rgba(255, 255, 255, 0.8);
+    -fx-text-fill: #333333;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 8 15;
+}
+
+.send-button:hover {
+    -fx-background-color: white;
+}
+
+.turn-indicator {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-color: rgba(0, 153, 51, 0.8);
+    -fx-background-radius: 20;
+    -fx-padding: 8 25;
+    -fx-font-size: 18px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 8, 0, 0, 2);
+    -fx-border-color: rgba(255, 255, 255, 0.5);
+    -fx-border-width: 2;
+    -fx-border-radius: 20;
+}
+
+.discard-label {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-color: rgba(0, 0, 0, 0.5);
+    -fx-background-radius: 15;
+    -fx-padding: 5 15;
+}
+
+.card-pile-label {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 5;
+    -fx-background-color: rgba(0, 0, 0, 0.8);
+    -fx-background-radius: 10;
+    -fx-translate-y: 60;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 5, 0, 0, 2);
+    -fx-view-order: -1;
+    -fx-opacity: 0.95;
+    -fx-border-color: rgba(255, 255, 255, 0.5);
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+    -fx-font-size: 12px;
+}
+
+.direction-text {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 5 10;
+    -fx-background-color: rgba(0, 0, 0, 0.6);
+    -fx-background-radius: 10;
+}
+
+.direction-container {
+    -fx-background-color: rgba(0, 0, 0, 0.5);
+    -fx-background-radius: 15;
+    -fx-padding: 5 15;
+    -fx-spacing: 10;
+    -fx-alignment: center;
+}
+
+.direction-indicator {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.8), 10, 0, 0, 0);
+}
+
+.quit-button {
+    -fx-background-color: rgba(220, 53, 69, 0.8);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 20;
+    -fx-padding: 8 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 5, 0, 0, 2);
+}
+
+.quit-button:hover {
+    -fx-background-color: rgba(220, 53, 69, 1.0);
+}
+
+.exit-button {
+    -fx-background-color: rgba(52, 152, 219, 0.8);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 20;
+    -fx-padding: 8;
+    -fx-graphic-text-gap: 8;
+    -fx-content-display: graphic-only;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 5, 0, 0, 2);
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+    -fx-max-width: 36px;
+    -fx-max-height: 36px;
+}
+
+.exit-button:hover {
+    -fx-background-color: rgba(52, 152, 219, 1.0);
+}
+
+.opponent-name-container {
+    -fx-padding: 10;
+    -fx-min-height: 50px;
+    -fx-alignment: center;
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-background-radius: 10;
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.2), 5, 0, 0, 0);
+}
+
+.side-opponent-name-container {
+    -fx-padding: 20;
+    -fx-alignment: center;
+    -fx-min-width: 80px;
+    -fx-min-height: 200px;
+}
+
+/* Rotated player labels for side players */
+#leftPlayerLabel, #rightPlayerLabel {
+    -fx-font-size: 16px;
+    -fx-background-color: rgba(0, 0, 0, 0.8);
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.5), 8, 0, 0, 2);
+    -fx-padding: 10 30;
+    -fx-min-width: 200px;
+    -fx-alignment: center;
+    -fx-text-alignment: center;
+    -fx-wrap-text: true;
+}
+
+#leftPlayerLabel {
+    -fx-rotate: 90;
+}
+
+#rightPlayerLabel {
+    -fx-rotate: -90;
+} 

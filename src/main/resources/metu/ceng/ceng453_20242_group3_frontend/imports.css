@@ -1,0 +1,7 @@
+/* 
+ * Main imports.css file for backwards compatibility
+ * This file simply imports the modular CSS structure
+ */
+
+/* Import the modular CSS structure */
+@import "css/imports.css"; 

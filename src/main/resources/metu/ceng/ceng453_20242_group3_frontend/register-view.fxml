@@ -15,7 +15,7 @@
 <StackPane fx:id="registerPane" alignment="CENTER" styleClass="register-pane" 
       xmlns="http://javafx.com/javafx" 
       xmlns:fx="http://javafx.com/fxml" 
-      fx:controller="metu.ceng.ceng453_20242_group3_frontend.controller.RegisterController"
+      fx:controller="metu.ceng.ceng453_20242_group3_frontend.features.auth.controller.RegisterController"
       prefHeight="768.0" prefWidth="1024.0">
     
     <!-- Background elements -->

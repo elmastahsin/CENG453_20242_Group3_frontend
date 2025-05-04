@@ -1,0 +1,63 @@
+/* 
+ * Menu styles for UNO Game
+ * Contains styles for main menu and leaderboard
+ */
+
+/* Main menu button styles */
+#playButton {
+    -fx-background-color: #ff6b6b;
+    -fx-background-radius: 8;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 15 30;
+    -fx-font-size: 16px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 5, 0, 0, 2);
+}
+
+#playButton:hover {
+    -fx-background-color: #ff5252;
+}
+
+#leaderboardButton {
+    -fx-background-color: #4dabf7;
+    -fx-background-radius: 8;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 15 30;
+    -fx-font-size: 16px;
+}
+
+#settingsButton {
+    -fx-background-color: #6c757d;
+    -fx-background-radius: 8;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 15 30;
+    -fx-font-size: 16px;
+}
+
+#logoutButton {
+    -fx-background-color: #dc3545;
+    -fx-background-radius: 8;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 15 30;
+    -fx-font-size: 16px;
+}
+
+/* Leaderboard styles */
+.leaderboard-list {
+    -fx-background-color: rgba(0, 0, 0, 0.2);
+    -fx-background-radius: 10;
+}
+
+.leaderboard-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-padding: 8 10;
+}
+
+.leaderboard-list .list-cell:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.2);
+} 

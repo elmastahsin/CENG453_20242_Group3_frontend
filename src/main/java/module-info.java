@@ -2,6 +2,8 @@ module metu.ceng.ceng453_20242_group3_frontend {
     requires javafx.controls;
     requires javafx.fxml;
     requires javafx.web;
+    requires java.desktop;
+    requires javafx.swing;
 
     requires org.controlsfx.controls;
     requires com.dlsc.formsfx;
@@ -14,15 +16,30 @@ module metu.ceng.ceng453_20242_group3_frontend {
     requires com.google.gson;
     requires com.fasterxml.jackson.databind;
 
-    opens metu.ceng.ceng453_20242_group3_frontend to javafx.fxml;
-    exports metu.ceng.ceng453_20242_group3_frontend;
+    // App package
+    exports metu.ceng.ceng453_20242_group3_frontend.app;
     
-    opens metu.ceng.ceng453_20242_group3_frontend.controller to javafx.fxml;
-    exports metu.ceng.ceng453_20242_group3_frontend.controller;
-    
-    exports metu.ceng.ceng453_20242_group3_frontend.model;
-    exports metu.ceng.ceng453_20242_group3_frontend.model.card;
-    exports metu.ceng.ceng453_20242_group3_frontend.service;
-    exports metu.ceng.ceng453_20242_group3_frontend.util;
+    // Config package
     exports metu.ceng.ceng453_20242_group3_frontend.config;
+    
+    // Auth feature
+    exports metu.ceng.ceng453_20242_group3_frontend.features.auth.controller to javafx.fxml;
+    opens metu.ceng.ceng453_20242_group3_frontend.features.auth.controller to javafx.fxml;
+    exports metu.ceng.ceng453_20242_group3_frontend.features.auth.model;
+    exports metu.ceng.ceng453_20242_group3_frontend.features.auth.service;
+    
+    // Game feature
+    exports metu.ceng.ceng453_20242_group3_frontend.features.game.controller to javafx.fxml;
+    opens metu.ceng.ceng453_20242_group3_frontend.features.game.controller to javafx.fxml;
+    exports metu.ceng.ceng453_20242_group3_frontend.features.game.model;
+    exports metu.ceng.ceng453_20242_group3_frontend.features.game.util;
+    
+    // Leaderboard feature
+    exports metu.ceng.ceng453_20242_group3_frontend.features.leaderboard.controller to javafx.fxml;
+    opens metu.ceng.ceng453_20242_group3_frontend.features.leaderboard.controller to javafx.fxml;
+    exports metu.ceng.ceng453_20242_group3_frontend.features.leaderboard.model;
+    exports metu.ceng.ceng453_20242_group3_frontend.features.leaderboard.service;
+    
+    // Common utilities
+    exports metu.ceng.ceng453_20242_group3_frontend.features.common.util;
 }

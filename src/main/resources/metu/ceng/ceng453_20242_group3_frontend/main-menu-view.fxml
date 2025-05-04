@@ -12,7 +12,7 @@
 <StackPane fx:id="mainMenuPane" alignment="CENTER" styleClass="main-menu-pane" 
       xmlns="http://javafx.com/javafx" 
       xmlns:fx="http://javafx.com/fxml" 
-      fx:controller="metu.ceng.ceng453_20242_group3_frontend.controller.MainMenuController"
+      fx:controller="metu.ceng.ceng453_20242_group3_frontend.features.game.controller.MainMenuController"
       prefHeight="768.0" prefWidth="1024.0">
     
     <!-- Background elements -->
