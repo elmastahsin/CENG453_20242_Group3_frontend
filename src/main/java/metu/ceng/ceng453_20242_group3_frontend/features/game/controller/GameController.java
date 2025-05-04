@@ -29,11 +29,13 @@ import metu.ceng.ceng453_20242_group3_frontend.features.game.view.CardRenderer;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ColorSelectionDialog;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.NotificationManager;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.UnoIndicatorManager;
-
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import metu.ceng.ceng453_20242_group3_frontend.features.common.util.ApiClient;
 
 /**
  * Controller for the game view.
@@ -119,6 +121,12 @@ public class GameController {
     private boolean isGameRunning = true;
     private boolean firstCardPlayed = false;
     
+    // Store game ID received from the server
+    private Integer gameId;
+    
+    // API client for backend communication
+    private ApiClient apiClient;
+    
     // Legacy fields to be removed after full refactoring
     private List<ComputerAIPlayer> aiPlayers = new ArrayList<>();
     
@@ -147,6 +155,9 @@ public class GameController {
             rightPlayerNameLabel,
             bottomPlayerNameLabel
         );
+        
+        // Initialize API client
+        apiClient = new ApiClient();
         
         // Initialize cheat buttons
         initializeCheatButtons();
@@ -193,6 +204,30 @@ public class GameController {
         this.game = new Game(
             "multiplayer".equalsIgnoreCase(gameMode) ? GameMode.MULTIPLAYER : GameMode.SINGLEPLAYER,
             playerCount
+        );
+        
+        // Reset game ID
+        this.gameId = null;
+        
+        // Call the game start API
+        String requestBody = String.format("{\"gameType\": \"SINGLE_PLAYER\", \"multiplayer\": false}");
+        apiClient.post("/game/start", requestBody, 
+            response -> {
+                try {
+                    // Parse the response and extract game ID
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    JsonNode root = objectMapper.readTree(response);
+                    if (root.has("data")) {
+                        this.gameId = root.get("data").asInt();
+                        System.out.println("Game started with ID: " + this.gameId);
+                    } else {
+                        System.err.println("Game ID not found in response: " + response);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to parse game start response: " + e.getMessage());
+                }
+            },
+            error -> System.err.println("Failed to call game start API: " + error)
         );
         
         // Debug output to confirm game direction
@@ -921,20 +956,33 @@ public class GameController {
     private void handleGameEnd(boolean isPlayerWinner) {
         isGameRunning = false;
         
+        // Get the name of the winner
+        String winnerName;
+        if (isPlayerWinner) {
+            winnerName = game.getPlayers().get(0).getName(); // Human player
+        } else {
+            winnerName = game.getWinner() != null ? game.getWinner().getName() : "AI Player";
+        }
+        
+        // Call the game end API if we have a valid game ID
+        if (gameId != null) {
+            String sanitizedWinnerName = winnerName.replace(" ", "");
+            String requestBody = String.format("{\"id\": %d, \"winner_username\": \"%s\"}", gameId, sanitizedWinnerName);
+            
+            apiClient.post("/game/end", requestBody, 
+                response -> System.out.println("Game end API called successfully: " + response),
+                error -> System.err.println("Failed to call game end API: " + error)
+            );
+        } else {
+            System.err.println("Cannot call game end API: No game ID available");
+        }
+        
         // Use Platform.runLater to ensure UI updates happen on the JavaFX thread
         Platform.runLater(() -> {
             // Find the StackPane in the center of the grid (game table)
             final StackPane gameTableStack = findGameTable();
             
             if (gameTableStack != null) {
-                // Get the name of the winner
-                String winnerName;
-                if (isPlayerWinner) {
-                    winnerName = game.getPlayers().get(0).getName(); // Human player
-                } else {
-                    winnerName = game.getWinner() != null ? game.getWinner().getName() : "AI Player";
-                }
-                
                 // Create a game over overlay
                 StackPane gameOverPane = new StackPane();
                 gameOverPane.setPrefWidth(500);
