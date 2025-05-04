@@ -12,6 +12,7 @@ import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -893,25 +894,96 @@ public class GameController {
     private void handleGameEnd(boolean isPlayerWinner) {
         isGameRunning = false;
         
-        // Use Platform.runLater to show the dialog after animation completes
+        // Use Platform.runLater to ensure UI updates happen on the JavaFX thread
         Platform.runLater(() -> {
-        // Create alert dialog
-        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-            javafx.scene.control.Alert.AlertType.INFORMATION
-        );
-        
-        alert.setTitle("Game Over");
-        
-        if (isPlayerWinner) {
-            alert.setHeaderText("You Win!");
-            alert.setContentText("Congratulations, you have won the game!");
-        } else {
-            alert.setHeaderText("You Lose!");
-            alert.setContentText("Better luck next time!");
-        }
-        
-        // Show dialog and return to main menu when closed
-        alert.showAndWait().ifPresent(response -> exitGame());
+            // Find the StackPane in the center of the grid (game table)
+            final StackPane gameTableStack = findGameTable();
+            
+            if (gameTableStack != null) {
+                // Get the name of the winner
+                String winnerName;
+                if (isPlayerWinner) {
+                    winnerName = game.getPlayers().get(0).getName(); // Human player
+                } else {
+                    winnerName = game.getWinner() != null ? game.getWinner().getName() : "AI Player";
+                }
+                
+                // Create a game over overlay
+                StackPane gameOverPane = new StackPane();
+                gameOverPane.setPrefWidth(500);
+                gameOverPane.setPrefHeight(400);
+                gameOverPane.setStyle("-fx-background-color: rgba(0, 0, 0, 0.8); -fx-background-radius: 20;");
+                gameOverPane.setEffect(new javafx.scene.effect.DropShadow(20, Color.BLACK));
+                
+                // Create content for the game over screen
+                VBox content = new VBox(20);
+                content.setAlignment(javafx.geometry.Pos.CENTER);
+                content.setPadding(new javafx.geometry.Insets(30));
+                
+                // Game over header
+                Label gameOverLabel = new Label("GAME OVER");
+                gameOverLabel.setStyle("-fx-font-size: 36px; -fx-font-weight: bold; -fx-text-fill: white;");
+                
+                // Winner text with animation
+                Label winnerLabel = new Label(isPlayerWinner ? "YOU WIN!" : "YOU LOSE!");
+                winnerLabel.setStyle("-fx-font-size: 48px; -fx-font-weight: bold; -fx-text-fill: " + 
+                        (isPlayerWinner ? "gold" : "crimson") + ";");
+                
+                // Winner name
+                Label winnerNameLabel = new Label("Winner: " + winnerName);
+                winnerNameLabel.setStyle("-fx-font-size: 24px; -fx-text-fill: white;");
+                
+                // Buttons container
+                HBox buttonsBox = new HBox(30);
+                buttonsBox.setAlignment(javafx.geometry.Pos.CENTER);
+                buttonsBox.setPadding(new javafx.geometry.Insets(20, 0, 0, 0));
+                
+                // Exit button
+                Button exitButton = new Button("EXIT GAME");
+                exitButton.setStyle("-fx-background-color: #F44336; -fx-text-fill: white; -fx-font-weight: bold; " +
+                        "-fx-font-size: 16px; -fx-padding: 15 30; -fx-background-radius: 10;");
+                exitButton.setOnAction(e -> navigateToMainMenu());
+                
+                // Add hover effects to button
+                exitButton.setOnMouseEntered(e -> 
+                    exitButton.setStyle("-fx-background-color: #EF5350; -fx-text-fill: white; -fx-font-weight: bold; " +
+                            "-fx-font-size: 16px; -fx-padding: 15 30; -fx-background-radius: 10;"));
+                exitButton.setOnMouseExited(e -> 
+                    exitButton.setStyle("-fx-background-color: #F44336; -fx-text-fill: white; -fx-font-weight: bold; " +
+                            "-fx-font-size: 16px; -fx-padding: 15 30; -fx-background-radius: 10;"));
+                
+                // Add button to container
+                buttonsBox.getChildren().add(exitButton);
+                
+                // Add all components to content
+                content.getChildren().addAll(gameOverLabel, winnerLabel, winnerNameLabel, buttonsBox);
+                
+                // Add content to game over pane
+                gameOverPane.getChildren().add(content);
+                
+                // Add animations
+                // 1. Pulsing animation for the winner text
+                ScaleTransition pulse = new ScaleTransition(Duration.seconds(1), winnerLabel);
+                pulse.setFromX(1.0);
+                pulse.setFromY(1.0);
+                pulse.setToX(1.1);
+                pulse.setToY(1.1);
+                pulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
+                pulse.setAutoReverse(true);
+                pulse.play();
+                
+                // Add the game over screen to the game table
+                gameTableStack.getChildren().add(gameOverPane);
+                
+                // Fade in animation for the overlay
+                javafx.animation.FadeTransition fadeIn = new javafx.animation.FadeTransition(Duration.millis(500), gameOverPane);
+                fadeIn.setFromValue(0);
+                fadeIn.setToValue(1);
+                fadeIn.play();
+            } else {
+                // Fallback to simple navigation if we can't find the game table
+                navigateToMainMenu();
+            }
         });
     }
     
@@ -970,5 +1042,30 @@ public class GameController {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+    
+    /**
+     * Finds the game table StackPane in the center of the grid.
+     * 
+     * @return The game table StackPane or null if not found
+     */
+    private StackPane findGameTable() {
+        for (javafx.scene.Node node : gamePane.getChildren()) {
+            if (node instanceof GridPane) {
+                GridPane gridPane = (GridPane) node;
+                for (javafx.scene.Node child : gridPane.getChildren()) {
+                    // Find the center stack pane
+                    Integer colIndex = GridPane.getColumnIndex(child);
+                    Integer rowIndex = GridPane.getRowIndex(child);
+                    
+                    if (colIndex != null && rowIndex != null && colIndex == 1 && rowIndex == 1) {
+                        if (child instanceof StackPane) {
+                            return (StackPane) child;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 } 
