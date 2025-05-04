@@ -462,13 +462,7 @@ public class GameController {
      * @param message The explanation message
      */
     private void showCardUnplayableMessage(String message) {
-        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-            javafx.scene.control.Alert.AlertType.INFORMATION
-        );
-        alert.setTitle("Invalid Move");
-        alert.setHeaderText("Can't Play This Card");
-        alert.setContentText(message);
-        alert.show();
+        notificationManager.showCardUnplayableNotification(message);
     }
     
     /**
@@ -840,7 +834,7 @@ public class GameController {
                 
                 if (isPlayable) {
                     // If the card is playable, show a notification and don't advance the turn
-                    notificationManager.showActionNotification("System", "The drawn card is playable. You may play it now.");
+                    notificationManager.showActionNotification("", "The drawn card is playable. You may play it now.");
                     
                     // Highlight the drawn card more prominently
                     cardView.setEffect(new javafx.scene.effect.DropShadow(20, Color.GOLD));
@@ -857,7 +851,7 @@ public class GameController {
                     game.advanceTurnAfterDraw();
                     
                     // Show a notification that the card is not playable
-                    notificationManager.showActionNotification("System", "The drawn card cannot be played. Turn passed.");
+                    notificationManager.showActionNotification("", "The drawn card cannot be played. Turn passed.");
                 
                 // Update turn label
                 updateTurnLabel();
