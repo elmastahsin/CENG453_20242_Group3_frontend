@@ -110,9 +110,14 @@ public class Game {
 
     public CardColor getCurrentColor() {
         Card topCard = discardPile.peekCard();
-        if (topCard != null && topCard.getColor() != CardColor.MULTI) {
+        // For wild cards, use the color that was explicitly set
+        if (topCard != null && topCard.isWildCard()) {
+            return currentColor;
+        } else if (topCard != null) {
+            // For regular cards, use the card's color
             return topCard.getColor();
         }
+        // If no card has been played yet, return the current color
         return currentColor;
     }
 
@@ -260,32 +265,37 @@ public class Game {
         if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
             boolean playable = !hasMatchingColorCard;
             if (!playable) {
-                System.out.println("Card not playable (has matching color cards): " + card);
+                System.out.println("WILD_DRAW_FOUR not playable - player has matching color cards: " + card);
             }
             return playable;
         }
 
-        // Regular wild cards can always be played
+        // Regular wild cards can always be played, regardless of the current color
         if (card.getAction() == CardAction.WILD) {
+            System.out.println("WILD card is always playable: " + card);
             return true;
         }
 
         // Cards matching the current color can be played
         if (card.getColor() == currentColor) {
+            System.out.println("Card matches current color (" + currentColor + "): " + card);
             return true;
         }
 
         // Number cards matching the top card's value can be played
         if (topCard.isNumberCard() && card.isNumberCard() && topCard.getValue() == card.getValue()) {
+            System.out.println("Card matches top card value (" + topCard.getValue() + "): " + card);
             return true;
         }
 
         // Action cards matching the top card's action can be played (except wilds)
         if (topCard.isActionCard() && card.isActionCard() && topCard.getAction() == card.getAction()
                 && !card.isWildCard() && !topCard.isWildCard()) {
+            System.out.println("Card matches top card action (" + topCard.getAction() + "): " + card);
             return true;
         }
 
+        System.out.println("Card is not playable: " + card);
         return false;
     }
 

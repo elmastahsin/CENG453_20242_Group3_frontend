@@ -653,7 +653,7 @@ public class GameController {
                     // For DRAW_TWO and WILD_DRAW_FOUR cards, force an immediate UI update 
                     // to show the drawn cards in opponent hands
                     if (card.getAction() == CardAction.DRAW_TWO || card.getAction() == CardAction.WILD_DRAW_FOUR) {
-                        updateUI();
+            updateUI();
                     }
                 }
             });

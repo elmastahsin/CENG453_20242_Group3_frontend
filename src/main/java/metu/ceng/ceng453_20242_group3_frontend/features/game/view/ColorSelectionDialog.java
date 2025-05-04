@@ -82,35 +82,19 @@ public class ColorSelectionDialog {
      * @return A styled button for the color
      */
     private Button createColorButton(Color color, CardColor cardColor, Consumer<CardColor> onColorSelected) {
+        // Create button with color fill
         Button button = new Button();
         button.setPrefSize(70, 70);
-        button.setStyle("-fx-background-color: transparent;");
-        
-        Rectangle colorRect = new Rectangle(60, 60);
-        colorRect.setFill(color);
-        colorRect.setArcWidth(10);
-        colorRect.setArcHeight(10);
-        colorRect.setStroke(Color.WHITE);
-        colorRect.setStrokeWidth(2);
-        
-        button.setGraphic(colorRect);
+        button.setStyle("-fx-background-color: " + toRGBCode(color) + "; -fx-background-radius: 10; -fx-border-color: white; -fx-border-width: 2; -fx-border-radius: 10;");
         
         // Add hover effect
-        colorRect.setOnMouseEntered(e -> {
-            colorRect.setEffect(new javafx.scene.effect.DropShadow(15, Color.WHITE));
-            colorRect.setScaleX(1.1);
-            colorRect.setScaleY(1.1);
-        });
+        button.setOnMouseEntered(e -> button.setEffect(new javafx.scene.effect.DropShadow(10, color.brighter())));
+        button.setOnMouseExited(e -> button.setEffect(null));
         
-        colorRect.setOnMouseExited(e -> {
-            colorRect.setEffect(null);
-            colorRect.setScaleX(1.0);
-            colorRect.setScaleY(1.0);
-        });
-        
-        // Set action
+        // Add click action
         button.setOnAction(e -> {
-            selectedColor = cardColor;
+            this.selectedColor = cardColor;
+            System.out.println("Wild card color selected: " + cardColor);
             onColorSelected.accept(cardColor);
             dialogStage.close();
         });
@@ -132,5 +116,18 @@ public class ColorSelectionDialog {
      */
     public CardColor getSelectedColor() {
         return selectedColor;
+    }
+    
+    /**
+     * Converts a JavaFX Color to a CSS RGB code string.
+     * 
+     * @param color The JavaFX Color to convert
+     * @return A CSS-compatible RGB color string
+     */
+    private String toRGBCode(Color color) {
+        return String.format("rgb(%d, %d, %d)", 
+            (int) (color.getRed() * 255),
+            (int) (color.getGreen() * 255),
+            (int) (color.getBlue() * 255));
     }
 } 
