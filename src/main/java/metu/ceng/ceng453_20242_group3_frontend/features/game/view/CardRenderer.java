@@ -347,7 +347,7 @@ public class CardRenderer {
         Rectangle cardBack = new Rectangle(CARD_WIDTH, CARD_HEIGHT);
         cardBack.setArcWidth(CARD_ARC);
         cardBack.setArcHeight(CARD_ARC);
-        cardBack.setFill(UNO_RED);
+        cardBack.setFill(BLACK_COLOR);
         cardBack.setStroke(Color.WHITE);
         cardBack.setStrokeWidth(3);
         cardView.getChildren().add(cardBack);

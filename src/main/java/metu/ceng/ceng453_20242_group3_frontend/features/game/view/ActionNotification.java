@@ -25,31 +25,44 @@ public class ActionNotification {
     private final SequentialTransition animation;
     
     /**
-     * Creates a new action notification.
+     * Creates a notification with the specified urgency level.
      * 
      * @param playerName The name of the player performing the action
      * @param actionMessage The action message to display
-     * @param isUrgent Whether the notification is urgent (different styling)
+     * @param isUrgent Whether the notification is urgent (affects timing)
      */
     public ActionNotification(String playerName, String actionMessage, boolean isUrgent) {
-        // Create the notification container
         notificationPane = new StackPane();
-        notificationPane.setMaxWidth(300); // Reduced width for left corner positioning
-        notificationPane.setMaxHeight(100);
-        notificationPane.setOpacity(0);
+        notificationPane.setPrefWidth(320);
+        notificationPane.setPrefHeight(60);
+        notificationPane.setMaxWidth(320);
+        notificationPane.setMaxHeight(60);
+        notificationPane.setOpacity(0); // Start invisible for animation
         
-        // Create the notification background
-        Rectangle background = new Rectangle(300, 80); // Adjusted width
+        // Background with rounded corners
+        Rectangle background = new Rectangle(320, 60);
         background.setArcWidth(15);
         background.setArcHeight(15);
         
-        // Set background color based on urgency
-        if (isUrgent) {
-            background.setFill(Color.rgb(220, 20, 60, 0.9)); // Crimson for UNO calls and important actions
+        // Choose background color based on message type
+        if (actionMessage.equals("calls UNO!")) {
+            // Special UNO call background
+            background.setFill(Color.rgb(211, 47, 47, 0.9)); // UNO Red with transparency
+            background.setStroke(Color.WHITE);
+            background.setStrokeWidth(2);
+        } else if (actionMessage.contains("drew a card and can play it")) {
+            // Special notification for AI drawing a playable card
+            background.setFill(Color.rgb(67, 160, 71, 0.9)); // Green with transparency
+            background.setStroke(Color.WHITE);
+            background.setStrokeWidth(1);
+        } else if (actionMessage.contains("can't play") || actionMessage.contains("not your turn") || actionMessage.contains("match")) {
+            // Special notification for unplayable cards
+            background.setFill(Color.rgb(211, 47, 47, 0.9)); // Red with transparency
             background.setStroke(Color.WHITE);
             background.setStrokeWidth(2);
         } else {
-            background.setFill(Color.rgb(0, 0, 0, 0.8));
+            // Default notification background
+            background.setFill(Color.rgb(33, 33, 33, 0.9)); // Dark gray with transparency
             background.setStroke(Color.WHITE);
             background.setStrokeWidth(1);
         }
@@ -197,6 +210,16 @@ public class ActionNotification {
      */
     public static ActionNotification createDrawnPlayableCardNotification(String playerName) {
         return new ActionNotification(playerName, "drew a card and can play it", true);
+    }
+    
+    /**
+     * Creates a special notification for unplayable cards.
+     * 
+     * @param message The error message explaining why the card can't be played
+     * @return A configured action notification for unplayable card
+     */
+    public static ActionNotification createUnplayableCardNotification(String message) {
+        return new ActionNotification("", message, true);
     }
     
     /**

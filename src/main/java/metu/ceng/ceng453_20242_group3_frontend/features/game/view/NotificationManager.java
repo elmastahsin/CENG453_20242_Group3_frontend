@@ -1,6 +1,7 @@
 package metu.ceng.ceng453_20242_group3_frontend.features.game.view;
 
 import javafx.application.Platform;
+import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 
@@ -156,5 +157,23 @@ public class NotificationManager {
         if (actionMessage != null) {
             showActionNotification(playerName, actionMessage);
         }
+    }
+    
+    /**
+     * Shows a notification explaining why a card can't be played.
+     * 
+     * @param message The explanation message
+     */
+    public void showCardUnplayableNotification(String message) {
+        ActionNotification notification = ActionNotification.createUnplayableCardNotification(message);
+        notification.getNotificationPane().setStyle("-fx-background-color: rgba(211, 47, 47, 0.9);"); // Red background for errors
+        
+        // Add notification to the overlay
+        AnchorPane.setTopAnchor(notification.getNotificationPane(), 120.0);
+        AnchorPane.setRightAnchor(notification.getNotificationPane(), 10.0);
+        parentPane.getChildren().add(notification.getNotificationPane());
+        
+        // Show the notification
+        notification.show();
     }
 } 

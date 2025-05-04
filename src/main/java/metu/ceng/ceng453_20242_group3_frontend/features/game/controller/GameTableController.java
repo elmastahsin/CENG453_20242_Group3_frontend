@@ -33,7 +33,6 @@ public class GameTableController {
     
     // Add a field to store the game table animation
     private Timeline gameTableAnimation;
-    private Duration gameTableAnimationDuration;
     
     /**
      * Creates a new game table controller.
