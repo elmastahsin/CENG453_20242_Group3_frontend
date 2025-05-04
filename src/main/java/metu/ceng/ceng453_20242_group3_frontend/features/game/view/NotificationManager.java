@@ -36,10 +36,10 @@ public class NotificationManager {
             // Create the notification
             ActionNotification notification = new ActionNotification(playerName, message);
             
-            // Center position in parent pane
+            // Position in top-left corner of the screen
             StackPane notificationPane = notification.getNotificationPane();
-            notificationPane.setLayoutX((parentPane.getWidth() - notificationPane.getPrefWidth()) / 2);
-            notificationPane.setLayoutY(100); // Position notification near the top of the screen
+            notificationPane.setLayoutX(20); // Fixed left margin
+            notificationPane.setLayoutY(20); // Fixed top margin
             
             // Add to parent and show
             parentPane.getChildren().add(notificationPane);
@@ -59,10 +59,10 @@ public class NotificationManager {
             // Create the notification
             ActionNotification notification = ActionNotification.createColorChangeNotification(playerName, selectedColor);
             
-            // Center position in parent pane
+            // Position below any previous notification in top-left
             StackPane notificationPane = notification.getNotificationPane();
-            notificationPane.setLayoutX((parentPane.getWidth() - notificationPane.getPrefWidth()) / 2);
-            notificationPane.setLayoutY(180); // Position below any other notifications
+            notificationPane.setLayoutX(20); // Fixed left margin
+            notificationPane.setLayoutY(100); // Position below general notifications
             
             // Add to parent and show
             parentPane.getChildren().add(notificationPane);
@@ -81,10 +81,10 @@ public class NotificationManager {
             // Create the notification
             ActionNotification notification = ActionNotification.createUnoCallNotification(playerName);
             
-            // Center position in parent pane
+            // Position in top-left but with priority (UNO calls are important)
             StackPane notificationPane = notification.getNotificationPane();
-            notificationPane.setLayoutX((parentPane.getWidth() - notificationPane.getPrefWidth()) / 2);
-            notificationPane.setLayoutY(100); // Position notification near the top of the screen
+            notificationPane.setLayoutX(20); // Fixed left margin 
+            notificationPane.setLayoutY(20); // Same as regular notifications
             
             // Add to parent and show
             parentPane.getChildren().add(notificationPane);

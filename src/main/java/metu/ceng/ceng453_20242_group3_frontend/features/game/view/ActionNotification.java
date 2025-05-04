@@ -34,12 +34,12 @@ public class ActionNotification {
     public ActionNotification(String playerName, String actionMessage, boolean isUrgent) {
         // Create the notification container
         notificationPane = new StackPane();
-        notificationPane.setMaxWidth(350);
+        notificationPane.setMaxWidth(300); // Reduced width for left corner positioning
         notificationPane.setMaxHeight(100);
         notificationPane.setOpacity(0);
         
         // Create the notification background
-        Rectangle background = new Rectangle(350, 80);
+        Rectangle background = new Rectangle(300, 80); // Adjusted width
         background.setArcWidth(15);
         background.setArcHeight(15);
         
@@ -56,7 +56,7 @@ public class ActionNotification {
         
         // Create the notification content
         HBox content = new HBox(15);
-        content.setAlignment(Pos.CENTER);
+        content.setAlignment(Pos.CENTER_LEFT); // Left-aligned for corner positioning
         content.setPadding(new Insets(10));
         
         // Create the notification text
@@ -71,7 +71,7 @@ public class ActionNotification {
         }
         
         textLabel.setWrapText(true);
-        textLabel.setTextAlignment(TextAlignment.CENTER);
+        textLabel.setTextAlignment(TextAlignment.LEFT); // Left-aligned text
         
         // Only add color indicator for UNO calls and color changes (wild cards)
         if (actionMessage.contains("UNO")) {

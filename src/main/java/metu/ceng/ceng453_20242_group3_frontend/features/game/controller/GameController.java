@@ -272,9 +272,6 @@ public class GameController {
         // Update the UI with initial game state
         updateUI();
         
-        // Add the test button for UNO indicators
-        addTestButton();
-        
         // Update UNO indicators based on card counts
         updateUnoIndicators();
         
@@ -930,37 +927,6 @@ public class GameController {
     private void updateUnoIndicators() {
         // Use the UNO indicator manager to update indicators
         unoIndicatorManager.updateUnoIndicators(game.getPlayers());
-    }
-    
-    /**
-     * Adds a test button to trigger UNO indicator testing.
-     * This method is only for development/testing purposes.
-     */
-    private void addTestButton() {
-        Button testButton = new Button("Test UNO Indicators");
-        testButton.setLayoutX(10);
-        testButton.setLayoutY(10);
-        testButton.setStyle("-fx-background-color: #666; -fx-text-fill: white;");
-        
-        // Add click handler to test UNO indicators
-        testButton.setOnAction(event -> {
-            testUnoIndicators();
-        });
-        
-        // Add to game pane
-        gamePane.getChildren().add(testButton);
-    }
-    
-    /**
-     * Temporarily shows UNO indicators for all players to test positioning.
-     * This method is only for development/testing purposes.
-     */
-    private void testUnoIndicators() {
-        // Show test indicators using the UNO indicator manager
-        unoIndicatorManager.showTestUnoIndicators();
-        
-        // Show a notification explaining the test
-        notificationManager.showActionNotification("TESTING", "UNO indicators shown for all players");
     }
     
     /**
