@@ -397,4 +397,79 @@
 
 #rightPlayerLabel {
     -fx-rotate: -90;
+}
+
+/* Cheat Buttons Container */
+.cheat-buttons-container {
+    -fx-padding: 10 15;
+    -fx-background-color: rgba(0, 0, 0, 0.5);
+    -fx-background-radius: 15;
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+    -fx-border-width: 1;
+    -fx-border-radius: 15;
+    -fx-margin: 8 0;
+}
+
+/* Base style for all cheat buttons */
+.cheat-button {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+    -fx-background-radius: 15;
+    -fx-padding: 6 10;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 5, 0, 0, 2);
+    -fx-cursor: hand;
+    -fx-min-width: 80px;
+    -fx-border-width: 1;
+    -fx-border-color: rgba(255, 255, 255, 0.5);
+    -fx-border-radius: 15;
+}
+
+.cheat-button:hover {
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.8), 8, 0, 0, 0);
+}
+
+.cheat-button:disabled {
+    -fx-opacity: 0.5;
+    -fx-cursor: default;
+}
+
+/* Skip button - blue */
+.skip-button {
+    -fx-background-color: #4a69bd;
+}
+
+.skip-button:hover {
+    -fx-background-color: #5a7ad1;
+}
+
+/* Reverse button - green */
+.reverse-button {
+    -fx-background-color: #2ecc71;
+}
+
+.reverse-button:hover {
+    -fx-background-color: #3ee883;
+}
+
+/* Draw Two button - red */
+.draw-button {
+    -fx-background-color: #e74c3c;
+}
+
+.draw-button:hover {
+    -fx-background-color: #f55a4a;
+}
+
+/* Wild button - rainbow gradient */
+.wild-button {
+    -fx-background-color: linear-gradient(to right, #ff5e5e, #ffce54, #a0d468, #4fc1e9);
+    -fx-text-fill: #333333;
+}
+
+/* Wild Draw Four button - darker rainbow gradient */
+.wild-draw-four-button {
+    -fx-background-color: linear-gradient(to right, #c0392b, #f39c12, #27ae60, #2980b9);
 } 

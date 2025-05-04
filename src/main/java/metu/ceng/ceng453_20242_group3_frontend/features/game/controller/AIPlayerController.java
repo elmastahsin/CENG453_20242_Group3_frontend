@@ -98,8 +98,8 @@ public class AIPlayerController {
         Player currentPlayer = game.getCurrentPlayer();
         
         if (currentPlayerIndex > 0 && currentPlayer != null && currentPlayer.isAI()) {
-            // Create a delay so AI doesn't play immediately
-            PauseTransition pause = new PauseTransition(Duration.millis(5000));
+            // Create a delay so AI doesn't play immediately - reduced from 5000ms to 3000ms
+            PauseTransition pause = new PauseTransition(Duration.millis(3000));
             pause.setOnFinished(e -> {
                 int aiIndex = currentPlayerIndex;
                 // Make sure it's still the same AI's turn after the delay
@@ -142,9 +142,9 @@ public class AIPlayerController {
             if (drawTwoCard != null) {
                 System.out.println("AI is responding to Draw Two with another Draw Two: " + drawTwoCard);
                 
-                // Play the card with a delay
+                // Play the card with a delay - reduced from 2000ms to 1000ms
                 final Card selectedCard = drawTwoCard;
-                PauseTransition pause = new PauseTransition(Duration.millis(2000));
+                PauseTransition pause = new PauseTransition(Duration.millis(1000));
                 pause.setOnFinished(e -> playAICard(aiIndex, selectedCard));
                 pause.play();
                 return;
@@ -152,7 +152,7 @@ public class AIPlayerController {
             
             // If no Draw Two card available, AI will draw the stacked cards
             System.out.println("AI has no Draw Two to respond with, will draw stacked cards");
-            PauseTransition pause = new PauseTransition(Duration.millis(2000));
+            PauseTransition pause = new PauseTransition(Duration.millis(1000));
             pause.setOnFinished(e -> {
                 // Draw cards without advancing turn - will handle the accumulated stack
                 Card drawnCard = game.drawCardWithoutAdvancingTurn();
@@ -178,7 +178,7 @@ public class AIPlayerController {
         if (aiInstance.shouldDraw(aiPlayer.getHand())) {
             System.out.println("AI has no playable cards, will draw a card");
             
-            PauseTransition pause = new PauseTransition(Duration.millis(2000));
+            PauseTransition pause = new PauseTransition(Duration.millis(1000));
             pause.setOnFinished(e -> {
                 // Draw a card without advancing turn
                 Card drawnCard = game.drawCardWithoutAdvancingTurn();
@@ -197,17 +197,17 @@ public class AIPlayerController {
 
         if (cardToPlay != null) {
             System.out.println("AI found a playable card: " + cardToPlay);
-            // Play the card
+            // Play the card with reduced delay - from 2000ms to 1000ms
             final Card selectedCard = cardToPlay;
-            PauseTransition pause = new PauseTransition(Duration.millis(2000));
+            PauseTransition pause = new PauseTransition(Duration.millis(1000));
             pause.setOnFinished(e -> playAICard(aiIndex, selectedCard));
             pause.play();
         } else {
             // No playable card found, draw instead
             System.out.println("AI found no playable cards, drawing a card...");
             
-            // Draw a card without advancing turn
-            PauseTransition pause = new PauseTransition(Duration.millis(2000));
+            // Draw a card without advancing turn - reduced delay from 2000ms to 1000ms
+            PauseTransition pause = new PauseTransition(Duration.millis(1000));
             pause.setOnFinished(e -> {
                 Card drawnCard = game.drawCardWithoutAdvancingTurn();
                 System.out.println("AI drew: " + (drawnCard != null ? drawnCard.toString() : "null"));
@@ -257,8 +257,8 @@ public class AIPlayerController {
         if (!card.isPlayable()) {
             System.out.println("ERROR: Attempting to play an unplayable card: " + card + ". Drawing instead.");
             
-            // Draw a card instead
-            PauseTransition pause = new PauseTransition(Duration.millis(2000));
+            // Draw a card instead - reduced from 2000ms to 1000ms
+            PauseTransition pause = new PauseTransition(Duration.millis(1000));
             pause.setOnFinished(e -> {
                 Card drawnCard = game.drawCardWithoutAdvancingTurn();
                 System.out.println("AI drew: " + (drawnCard != null ? drawnCard.toString() : "null"));
@@ -313,8 +313,8 @@ public class AIPlayerController {
             // For DRAW_TWO and WILD_DRAW_FOUR cards, force an immediate callback update
             // to ensure the UI gets updated to show the drawn cards
             if (card.getAction() == CardAction.DRAW_TWO || card.getAction() == CardAction.WILD_DRAW_FOUR) {
-                // Additional delay to ensure cards are drawn before update
-                PauseTransition updateDelay = new PauseTransition(Duration.millis(500));
+                // Reduced delay from 500ms to 300ms 
+                PauseTransition updateDelay = new PauseTransition(Duration.millis(300));
                 updateDelay.setOnFinished(e -> cardPlayCallback.onCardPlayed(aiIndex, card));
                 updateDelay.play();
             } else {
@@ -338,8 +338,8 @@ public class AIPlayerController {
         } else {
             System.out.println("AI failed to play card: " + card);
             
-            // If play failed, try drawing instead
-            PauseTransition pause = new PauseTransition(Duration.millis(2000));
+            // If play failed, try drawing instead - reduced from 2000ms to 1000ms
+            PauseTransition pause = new PauseTransition(Duration.millis(1000));
             pause.setOnFinished(e -> {
                 Card drawnCard = game.drawCardWithoutAdvancingTurn();
                 System.out.println("AI drew: " + (drawnCard != null ? drawnCard.toString() : "null"));
@@ -349,6 +349,40 @@ public class AIPlayerController {
             });
             pause.play();
         }
+    }
+
+    /**
+     * Finds a card for the AI to play from its hand.
+     * Randomly selects from the available playable cards with improved randomness.
+     * 
+     * @param playerHand   The AI player's hand
+     * @param currentColor The current game color
+     * @return The card to play, or null if no playable card
+     */
+    public Card selectCardToPlay(List<Card> playerHand, CardColor currentColor) {
+        // First collect all playable cards
+        List<Card> playableCards = new ArrayList<>();
+        
+        for (Card card : playerHand) {
+            if (card.isPlayable()) {
+                playableCards.add(card);
+                System.out.println("AI found playable card: " + card);
+            }
+        }
+        
+        // If no playable cards, return null
+        if (playableCards.isEmpty()) {
+            System.out.println("AI couldn't find any playable cards");
+            return null;
+        }
+        
+        // Completely random selection with enhanced randomness
+        Random random = new Random(System.nanoTime()); // Use nano time for better randomness
+        int randomIndex = random.nextInt(playableCards.size());
+        Card selectedCard = playableCards.get(randomIndex);
+        
+        System.out.println("AI randomly selected: " + selectedCard + " from " + playableCards.size() + " playable cards");
+        return selectedCard;
     }
 
     /**
@@ -375,14 +409,14 @@ public class AIPlayerController {
             // Show a special notification for drawn playable card using a highlighted style
             notificationManager.showActionNotification(aiPlayer.getName(), "drew a card and can play it");
             
-            // Use a longer delay before playing the drawn card so players can clearly see what was drawn
-            PauseTransition pause = new PauseTransition(Duration.millis(3500));
+            // Use a shorter delay before playing the drawn card - reduced from 3500ms to 2000ms
+            PauseTransition pause = new PauseTransition(Duration.millis(2000));
             pause.setOnFinished(e -> {
                 // Show another notification when the AI actually plays the card
                 notificationManager.showActionNotification(aiPlayer.getName(), "plays drawn card: " + drawnCard.toString());
                 
-                // Add a small delay after the notification before playing the card
-                PauseTransition playDelay = new PauseTransition(Duration.millis(1000));
+                // Add a smaller delay after the notification before playing the card - reduced from 1000ms to 500ms
+                PauseTransition playDelay = new PauseTransition(Duration.millis(500));
                 playDelay.setOnFinished(event -> playAICard(aiIndex, drawnCard));
                 playDelay.play();
             });
@@ -406,39 +440,5 @@ public class AIPlayerController {
                 gameTableController.updatePlayerAreaAnimations(game);
             }
         }
-    }
-
-    /**
-     * Finds a card for the AI to play from its hand.
-     * Randomly selects from the available playable cards.
-     * 
-     * @param playerHand   The AI player's hand
-     * @param currentColor The current game color
-     * @return The card to play, or null if no playable card
-     */
-    public Card selectCardToPlay(List<Card> playerHand, CardColor currentColor) {
-        // First collect all playable cards
-        List<Card> playableCards = new ArrayList<>();
-        
-        for (Card card : playerHand) {
-            if (card.isPlayable()) {
-                playableCards.add(card);
-                System.out.println("AI found playable card: " + card);
-            }
-        }
-        
-        // If no playable cards, return null
-        if (playableCards.isEmpty()) {
-            System.out.println("AI couldn't find any playable cards");
-            return null;
-        }
-        
-        // Select a random card from the playable cards
-        Random random = new Random();
-        int randomIndex = random.nextInt(playableCards.size());
-        Card selectedCard = playableCards.get(randomIndex);
-        
-        System.out.println("AI randomly selected: " + selectedCard + " from " + playableCards.size() + " playable cards");
-        return selectedCard;
     }
 }

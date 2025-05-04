@@ -140,6 +140,16 @@
               GridPane.columnIndex="1" GridPane.rowIndex="2">
             <HBox fx:id="bottomPlayerCardsContainer" alignment="CENTER" spacing="-25.0" 
                   styleClass="player-cards-container" />
+            
+            <!-- Cheat buttons row -->
+            <HBox alignment="CENTER" spacing="8" styleClass="cheat-buttons-container">
+                <Button fx:id="skipButton" text="Skip" styleClass="cheat-button, skip-button" />
+                <Button fx:id="reverseButton" text="Reverse" styleClass="cheat-button, reverse-button" />
+                <Button fx:id="drawTwoButton" text="Draw Two" styleClass="cheat-button, draw-button" />
+                <Button fx:id="wildButton" text="Wild" styleClass="cheat-button, wild-button" />
+                <Button fx:id="wildDrawFourButton" text="Wild Draw Four" styleClass="cheat-button, wild-draw-four-button" />
+            </HBox>
+            
             <Label fx:id="bottomPlayerNameLabel" styleClass="player-name-label" text="Your Username" />
         </VBox>
 

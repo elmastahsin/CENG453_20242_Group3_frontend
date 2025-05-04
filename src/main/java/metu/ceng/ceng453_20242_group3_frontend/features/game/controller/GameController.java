@@ -5,6 +5,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Bounds;
+import javafx.geometry.Point2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -19,6 +20,9 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import javafx.animation.Timeline;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
 import metu.ceng.ceng453_20242_group3_frontend.features.common.util.SessionManager;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.model.*;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.CardRenderer;
@@ -94,6 +98,22 @@ public class GameController {
     @FXML
     private Label currentTurnLabel;
     
+    // Cheat buttons
+    @FXML
+    private Button skipButton;
+    
+    @FXML
+    private Button reverseButton;
+    
+    @FXML
+    private Button drawTwoButton;
+    
+    @FXML
+    private Button wildButton;
+    
+    @FXML
+    private Button wildDrawFourButton;
+    
     // Game state using our Game model
     private Game game;
     private boolean isGameRunning = true;
@@ -117,23 +137,28 @@ public class GameController {
     
     @FXML
     private void initialize() {
-        // Set local player name from session
-        if (SessionManager.getInstance().isLoggedIn()) {
-            String username = SessionManager.getInstance().getCurrentUser().getUsername();
-            bottomPlayerNameLabel.setText(username);
-        }
-        
-        // Set up exit game button
-        exitGameButton.setOnAction(event -> exitGame());
-        
-        // Initialize managers
+        // Initialize notification manager
         notificationManager = new NotificationManager(gamePane);
+        
+        // Initialize UNO indicator manager
         unoIndicatorManager = new UnoIndicatorManager(
             topPlayerNameLabel,
             leftPlayerNameLabel,
             rightPlayerNameLabel,
             bottomPlayerNameLabel
         );
+        
+        // Initialize cheat buttons
+        initializeCheatButtons();
+        
+        // Initialize our exit button
+        exitGameButton.setOnAction(event -> exitGame());
+        
+        // Set local player name from session
+        if (SessionManager.getInstance().isLoggedIn()) {
+            String username = SessionManager.getInstance().getCurrentUser().getUsername();
+            bottomPlayerNameLabel.setText(username);
+        }
         
         // Initialize game table controller
         gameTableController = new GameTableController(
@@ -726,11 +751,17 @@ public class GameController {
         if (game.getCurrentPlayerIndex() == 0) {
             currentTurnLabel.setText("YOUR TURN");
             currentTurnLabel.setStyle("-fx-background-color: rgba(0, 153, 51, 0.9); -fx-font-size: 20px; -fx-font-weight: bold; -fx-border-color: white; -fx-border-width: 2px; -fx-border-radius: 20px;"); // Green for player's turn
+            
+            // Enable cheat buttons when it's the player's turn
+            updateCheatButtonState(true);
         } else {
             // Display the appropriate opponent name based on new counterclockwise layout
             String playerName = currentPlayer.getName();
             currentTurnLabel.setText(playerName + "'S TURN");
             currentTurnLabel.setStyle("-fx-background-color: rgba(217, 83, 79, 0.9); -fx-font-size: 20px; -fx-font-weight: bold; -fx-border-color: white; -fx-border-width: 2px; -fx-border-radius: 20px;"); // Red for opponent's turn
+            
+            // Disable cheat buttons when it's not the player's turn
+            updateCheatButtonState(false);
         }
         
         // Update which player area is pulsing
@@ -1067,5 +1098,165 @@ public class GameController {
             }
         }
         return null;
+    }
+    
+    /**
+     * Initializes the cheat buttons for the human player
+     */
+    private void initializeCheatButtons() {
+        // Skip button event handler
+        skipButton.setOnAction(event -> playCheatCard(CardAction.SKIP));
+        
+        // Reverse button event handler
+        reverseButton.setOnAction(event -> playCheatCard(CardAction.REVERSE));
+        
+        // Draw Two button event handler
+        drawTwoButton.setOnAction(event -> playCheatCard(CardAction.DRAW_TWO));
+        
+        // Wild button event handler
+        wildButton.setOnAction(event -> playCheatCard(CardAction.WILD));
+        
+        // Wild Draw Four button event handler
+        wildDrawFourButton.setOnAction(event -> playCheatCard(CardAction.WILD_DRAW_FOUR));
+        
+        // Initially disable all cheat buttons - they'll be enabled during player's turn
+        updateCheatButtonState(false);
+    }
+    
+    /**
+     * Updates the enabled/disabled state of the cheat buttons.
+     * 
+     * @param isPlayerTurn Whether it's the human player's turn
+     */
+    private void updateCheatButtonState(boolean isPlayerTurn) {
+        skipButton.setDisable(!isPlayerTurn);
+        reverseButton.setDisable(!isPlayerTurn);
+        drawTwoButton.setDisable(!isPlayerTurn);
+        wildButton.setDisable(!isPlayerTurn);
+        wildDrawFourButton.setDisable(!isPlayerTurn);
+    }
+    
+    /**
+     * Plays a "cheat" card with the specified action.
+     * This creates a virtual card and plays it as if it was in the player's hand.
+     * 
+     * @param action The card action to play
+     */
+    private void playCheatCard(CardAction action) {
+        if (!isGameRunning || game == null) {
+            return;
+        }
+        
+        // Make sure it's the player's turn
+        if (game.getCurrentPlayerIndex() != 0) {
+            showCardUnplayableMessage("It's not your turn.");
+            return;
+        }
+        
+        System.out.println("=== CHEAT BUTTON PRESSED: " + action + " ===");
+        
+        // Check if this is the first play (no cards on discard pile yet)
+        boolean isFirstPlay = game.isDiscardPileEmpty();
+        System.out.println("Is first play: " + isFirstPlay);
+        
+        // Get the current color from the game - use RED as fallback if it's null
+        CardColor currentColor = game.getCurrentColor();
+        System.out.println("Current color before: " + currentColor);
+        
+        if (currentColor == null || isFirstPlay) {
+            currentColor = CardColor.RED; // Default to RED if no color is set
+            System.out.println("Using default RED color");
+        }
+        
+        System.out.println("Final color for card: " + currentColor);
+        
+        // Create a card of the appropriate type
+        Card card;
+        
+        // Special handling for Wild Draw Four - check if player has matching color cards
+        if (action == CardAction.WILD_DRAW_FOUR) {
+            Player player = game.getCurrentPlayer();
+            boolean hasMatchingColorCard = false;
+
+            if (isFirstPlay) {
+                showCardUnplayableMessage("You can't play a Wild Draw Four on the first turn.");
+                return;
+            }
+            
+            // Only check if there's a discard pile with a color
+            if (currentColor != null && currentColor != CardColor.MULTI) {
+                // Check player's hand for matching color cards
+                for (Card handCard : player.getHand()) {
+                    if (handCard.getColor() == currentColor) {
+                        hasMatchingColorCard = true;
+                        break;
+                    }
+                }
+            }
+            
+            // If player has matching color cards, they can't play Wild Draw Four
+            if (hasMatchingColorCard) {
+                System.out.println("Player has matching color cards - Wild Draw Four not allowed");
+                showCardUnplayableMessage("You can't play a Wild Draw Four when you have cards matching the current color.");
+                return;
+            }
+        }
+        
+        if (action == CardAction.WILD || action == CardAction.WILD_DRAW_FOUR) {
+            // Wild cards always use MULTI color initially
+            card = new Card(CardColor.MULTI, action);
+            System.out.println("Created wild card: " + card);
+            
+            // For wild cards, handle color selection
+            handleWildCardColorSelection(card, () -> {
+                System.out.println("Color selected for wild card: " + game.getCurrentColor());
+                
+                // Set the first card played flag for initial card
+                if (isFirstPlay) {
+                    firstCardPlayed = true;
+                    System.out.println("Setting firstCardPlayed = true");
+                }
+                
+                // Add the card to player's hand temporarily (so that game logic works)
+                Player player = game.getCurrentPlayer();
+                player.addCard(card);
+                System.out.println("Added card to player's hand: " + player.getHand());
+                
+                // Mark the card as playable to bypass the rule check
+                card.setPlayable(true);
+                System.out.println("Marked card as playable: " + card.isPlayable());
+                
+                // Play the card using the main finishCardPlay function
+                StackPane cardView = CardRenderer.createCardView(card);
+                System.out.println("Created card view for: " + card);
+                finishCardPlay(cardView, card);
+            });
+        } else {
+            // Non-wild cards use the current color
+            card = new Card(currentColor, action);
+            System.out.println("Created regular card: " + card);
+            
+            // Set the first card played flag for initial card
+            if (isFirstPlay) {
+                firstCardPlayed = true;
+                System.out.println("Setting firstCardPlayed = true");
+            }
+            
+            // Add the card to player's hand temporarily (so that game logic works)
+            Player player = game.getCurrentPlayer();
+            player.addCard(card);
+            System.out.println("Added card to player's hand: " + player.getHand());
+            
+            // Mark the card as playable to bypass the rule check
+            card.setPlayable(true);
+            System.out.println("Marked card as playable: " + card.isPlayable());
+            
+            // Create a visual representation of the card
+            StackPane cardView = CardRenderer.createCardView(card);
+            System.out.println("Created card view for: " + card);
+            
+            // Play the card using the main card play functionality
+            finishCardPlay(cardView, card);
+        }
     }
 } 
