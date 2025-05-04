@@ -311,24 +311,38 @@
     -fx-font-size: 12px;
 }
 
+.direction-container {
+    -fx-background-color: rgba(0, 0, 0, 0.5);
+    -fx-background-radius: 15;
+    -fx-padding: 5 15;
+    -fx-spacing: 15;
+    -fx-alignment: center;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 5, 0, 0, 2);
+}
+
 .direction-text {
     -fx-text-fill: white;
     -fx-font-weight: bold;
     -fx-padding: 5 10;
     -fx-background-color: rgba(0, 0, 0, 0.6);
     -fx-background-radius: 10;
-}
-
-.direction-container {
-    -fx-background-color: rgba(0, 0, 0, 0.5);
-    -fx-background-radius: 15;
-    -fx-padding: 5 15;
-    -fx-spacing: 10;
-    -fx-alignment: center;
+    -fx-font-size: 14px;
 }
 
 .direction-indicator {
-    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.8), 10, 0, 0, 0);
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.5), 8, 0, 0, 0);
+    -fx-cursor: default;
+    -fx-smooth: true; /* Better SVG rendering */
+    -fx-preserve-ratio: true;
+    -fx-fit-width: 40px;
+    -fx-fit-height: 40px;
+}
+
+.direction-indicator:hover {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.8), 12, 0, 0, 0);
+    -fx-scale-x: 1.1;
+    -fx-scale-y: 1.1;
+    -fx-cursor: hand;
 }
 
 .quit-button {

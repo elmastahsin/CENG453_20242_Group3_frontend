@@ -285,7 +285,7 @@ public class GameController {
         // Start the game (this deals cards and initializes the discard pile)
         game.startGame();
         
-        // Ensure direction indicator is updated immediately
+        // Initialize direction indicator
         updateDirectionIndicator();
         
         // When a new game starts, mark all cards as playable for the initial play
@@ -707,23 +707,19 @@ public class GameController {
         }
         
         Direction gameDirection = game.getDirection();
-        
         System.out.println("### UPDATING DIRECTION INDICATOR - CURRENT DIRECTION: " + gameDirection + " ###");
         
+        // Simple direct PNG loading
         boolean isClockwise = gameDirection == Direction.CLOCKWISE;
         String imagePath = isClockwise 
             ? "/images/arrow-clockwise.png" 
             : "/images/arrow-counterclockwise.png";
         
+        // Load the image directly
         Image directionImage = new Image(getClass().getResourceAsStream(imagePath));
         directionIndicator.setImage(directionImage);
         
-        // Add pulsing effect to make the direction more noticeable
-        if (gameTableAnimation != null) {
-            gameTableAnimation.stop();
-        }
-        
-        // Create a pulsing effect
+        // Animate it
         ScaleTransition pulse = new ScaleTransition(Duration.millis(1000), directionIndicator);
         pulse.setFromX(1.0);
         pulse.setFromY(1.0);

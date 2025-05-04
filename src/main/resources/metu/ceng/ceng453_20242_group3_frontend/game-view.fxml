@@ -159,7 +159,7 @@
                 <Label text="Direction:" styleClass="direction-text" />
                 <ImageView fx:id="directionIndicator" fitHeight="40.0" fitWidth="40.0" 
                            pickOnBounds="true" preserveRatio="true" styleClass="direction-indicator">
-                    <Image url="@../../../images/arrow-clockwise.png" />
+                    <Image url="@../../../images/arrow-counterclockwise.png" />
                 </ImageView>
                 <VBox.margin>
                     <Insets right="20" bottom="20" />
