@@ -94,7 +94,7 @@ public class AIPlayerController {
         int currentPlayerIndex = game.getCurrentPlayerIndex();
         if (currentPlayerIndex > 0) { // Player at index 0 is always human
             // Create a delay so AI doesn't play immediately
-            PauseTransition pause = new PauseTransition(Duration.millis(1000));
+            PauseTransition pause = new PauseTransition(Duration.millis(5000));
             pause.setOnFinished(e -> {
                 int aiIndex = currentPlayerIndex;
                 // Make sure it's still the same AI's turn after the delay
@@ -140,7 +140,7 @@ public class AIPlayerController {
             System.out.println("AI has no playable cards, will draw a card");
             
             // Delay before drawing
-            PauseTransition pause = new PauseTransition(Duration.millis(500));
+            PauseTransition pause = new PauseTransition(Duration.millis(2000));
             pause.setOnFinished(e -> {
                 // Draw a card
                 Card drawnCard = game.drawCardForCurrentPlayer();
@@ -171,7 +171,7 @@ public class AIPlayerController {
                 System.out.println("WARNING: AI tried to play a card marked as unplayable: " + cardToPlay);
                 
                 // Draw a card instead
-                PauseTransition pause = new PauseTransition(Duration.millis(500));
+                PauseTransition pause = new PauseTransition(Duration.millis(2000));
                 pause.setOnFinished(e -> {
                     Card drawnCard = game.drawCardForCurrentPlayer();
                     System.out.println("AI drew instead: " + (drawnCard != null ? drawnCard.toString() : "null"));
@@ -203,14 +203,14 @@ public class AIPlayerController {
                 game.setCurrentColor(selectedColor);
                 
                 // Small delay before playing the card
-                PauseTransition pause = new PauseTransition(Duration.millis(500));
+                PauseTransition pause = new PauseTransition(Duration.millis(2000));
                 pause.setOnFinished(e -> {
                     playAICard(aiIndex, finalCardToPlay);
                 });
                 pause.play();
             } else {
                 // Play card directly after a short delay
-                PauseTransition pause = new PauseTransition(Duration.millis(500));
+                PauseTransition pause = new PauseTransition(Duration.millis(2000));
                 pause.setOnFinished(e -> {
                     playAICard(aiIndex, finalCardToPlay);
                 });
@@ -220,7 +220,7 @@ public class AIPlayerController {
             // No playable card found, draw instead
             System.out.println("AI found no playable cards, drawing a card...");
             
-            PauseTransition pause = new PauseTransition(Duration.millis(500));
+            PauseTransition pause = new PauseTransition(Duration.millis(2000));
             pause.setOnFinished(e -> {
                 Card drawnCard = game.drawCardForCurrentPlayer();
                 System.out.println("AI drew: " + (drawnCard != null ? drawnCard.toString() : "null"));
@@ -362,7 +362,7 @@ public class AIPlayerController {
             System.out.println("AI failed to play card: " + card);
             
             // If play failed, try drawing instead
-            PauseTransition pause = new PauseTransition(Duration.millis(500));
+            PauseTransition pause = new PauseTransition(Duration.millis(2000));
             pause.setOnFinished(e -> {
                 Card drawnCard = game.drawCardForCurrentPlayer();
                 System.out.println("AI is drawing a card instead: " + drawnCard);

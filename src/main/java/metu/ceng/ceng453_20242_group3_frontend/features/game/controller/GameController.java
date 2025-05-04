@@ -1,64 +1,34 @@
 package metu.ceng.ceng453_20242_group3_frontend.features.game.controller;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.ArrayList;
-import java.net.URL;
-
+import javafx.animation.ScaleTransition;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Bounds;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ContentDisplay;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
-import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import javafx.animation.PauseTransition;
-import javafx.animation.ScaleTransition;
-import javafx.application.Platform;
-import javafx.animation.Animation;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
-import javafx.geometry.Bounds;
-import javafx.geometry.Point2D;
-import javafx.geometry.Pos;
-import javafx.scene.Node;
-import javafx.scene.effect.DropShadow;
-import javafx.scene.layout.Pane;
-
-import metu.ceng.ceng453_20242_group3_frontend.config.AppConfig;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Card;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.model.CardAction;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.model.CardColor;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.model.CardType;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.model.ComputerAIPlayer;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Game;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.model.GameMode;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Player;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.model.PlayerCount;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Direction;
 import metu.ceng.ceng453_20242_group3_frontend.features.common.util.SessionManager;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.model.*;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.CardRenderer;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ColorSelectionDialog;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ColorNotification;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.view.ActionNotification;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.NotificationManager;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.view.UnoIndicatorManager;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.controller.GameTableController;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.controller.AIPlayerController;
-import metu.ceng.ceng453_20242_group3_frontend.features.game.controller.CardAnimationController;
+
+import java.io.IOException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Controller for the game view.
@@ -805,12 +775,12 @@ public class GameController {
         // Current player is the human player (always at index 0)
         if (game.getCurrentPlayerIndex() == 0) {
             currentTurnLabel.setText("YOUR TURN");
-            currentTurnLabel.setStyle("-fx-background-color: rgba(0, 153, 51, 0.8);"); // Green for player's turn
+            currentTurnLabel.setStyle("-fx-background-color: rgba(0, 153, 51, 0.9); -fx-font-size: 20px; -fx-font-weight: bold; -fx-border-color: white; -fx-border-width: 2px; -fx-border-radius: 20px;"); // Green for player's turn
         } else {
             // Display the appropriate opponent name based on new counterclockwise layout
             String playerName = currentPlayer.getName();
             currentTurnLabel.setText(playerName + "'S TURN");
-            currentTurnLabel.setStyle("-fx-background-color: rgba(217, 83, 79, 0.8);"); // Red for opponent's turn
+            currentTurnLabel.setStyle("-fx-background-color: rgba(217, 83, 79, 0.9); -fx-font-size: 20px; -fx-font-weight: bold; -fx-border-color: white; -fx-border-width: 2px; -fx-border-radius: 20px;"); // Red for opponent's turn
         }
         
         // Update which player area is pulsing
