@@ -60,9 +60,12 @@
                                 <TableView fx:id="weeklyTable" styleClass="table-view" prefHeight="400.0">
                                     <columns>
                                         <TableColumn fx:id="weeklyRankColumn" prefWidth="75.0" text="Rank" />
-                                        <TableColumn fx:id="weeklyUsernameColumn" prefWidth="150.0" text="Username" />
-                                        <TableColumn fx:id="weeklyScoreColumn" prefWidth="100.0" text="Score" />
+                                        <TableColumn fx:id="weeklyUsernameColumn" prefWidth="300.0" text="Username" />
+                                        <TableColumn fx:id="weeklyScoreColumn" prefWidth="150.0" text="Score" />
                                     </columns>
+                                    <columnResizePolicy>
+                                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                    </columnResizePolicy>
                                 </TableView>
                             </content>
                         </Tab>
@@ -71,9 +74,12 @@
                                 <TableView fx:id="monthlyTable" styleClass="table-view" prefHeight="400.0">
                                     <columns>
                                         <TableColumn fx:id="monthlyRankColumn" prefWidth="75.0" text="Rank" />
-                                        <TableColumn fx:id="monthlyUsernameColumn" prefWidth="150.0" text="Username" />
-                                        <TableColumn fx:id="monthlyScoreColumn" prefWidth="100.0" text="Score" />
+                                        <TableColumn fx:id="monthlyUsernameColumn" prefWidth="300.0" text="Username" />
+                                        <TableColumn fx:id="monthlyScoreColumn" prefWidth="150.0" text="Score" />
                                     </columns>
+                                    <columnResizePolicy>
+                                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                    </columnResizePolicy>
                                 </TableView>
                             </content>
                         </Tab>
@@ -82,9 +88,12 @@
                                 <TableView fx:id="allTimeTable" styleClass="table-view" prefHeight="400.0">
                                     <columns>
                                         <TableColumn fx:id="allTimeRankColumn" prefWidth="75.0" text="Rank" />
-                                        <TableColumn fx:id="allTimeUsernameColumn" prefWidth="150.0" text="Username" />
-                                        <TableColumn fx:id="allTimeScoreColumn" prefWidth="100.0" text="Score" />
+                                        <TableColumn fx:id="allTimeUsernameColumn" prefWidth="300.0" text="Username" />
+                                        <TableColumn fx:id="allTimeScoreColumn" prefWidth="150.0" text="Score" />
                                     </columns>
+                                    <columnResizePolicy>
+                                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                    </columnResizePolicy>
                                 </TableView>
                             </content>
                         </Tab>
