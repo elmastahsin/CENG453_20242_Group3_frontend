@@ -1,5 +1,6 @@
 package metu.ceng.ceng453_20242_group3_frontend.features.game.view;
 
+import javafx.application.Platform;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 
@@ -8,69 +9,87 @@ import metu.ceng.ceng453_20242_group3_frontend.features.game.model.CardAction;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.model.CardColor;
 
 /**
- * Manages game notifications and provides a centralized way to display notifications.
+ * Manager for displaying game notifications
  */
 public class NotificationManager {
     
-    private final Pane gamePane;
+    private final Pane parentPane;
     
     /**
      * Creates a new notification manager.
      * 
-     * @param gamePane The parent pane where notifications will be displayed
+     * @param parentPane The parent pane to add notifications to
      */
-    public NotificationManager(Pane gamePane) {
-        this.gamePane = gamePane;
+    public NotificationManager(Pane parentPane) {
+        this.parentPane = parentPane;
     }
     
     /**
-     * Shows a notification about a player declaring UNO.
+     * Shows an action notification.
      * 
-     * @param playerName The player's name
+     * @param playerName The name of the player performing the action
+     * @param message The action message to display
      */
-    public void showUnoCallNotification(String playerName) {
-        ActionNotification notification = ActionNotification.createUnoCallNotification(playerName);
-        showNotification(notification);
+    public void showActionNotification(String playerName, String message) {
+        // Run on JavaFX thread to avoid threading issues
+        Platform.runLater(() -> {
+            // Create the notification
+            ActionNotification notification = new ActionNotification(playerName, message);
+            
+            // Center position in parent pane
+            StackPane notificationPane = notification.getNotificationPane();
+            notificationPane.setLayoutX((parentPane.getWidth() - notificationPane.getPrefWidth()) / 2);
+            notificationPane.setLayoutY(100); // Position notification near the top of the screen
+            
+            // Add to parent and show
+            parentPane.getChildren().add(notificationPane);
+            notification.show();
+        });
     }
     
     /**
-     * Shows a notification about a color selection.
+     * Shows a color selection notification.
      * 
-     * @param playerName The player's name
+     * @param playerName The name of the player who selected the color
      * @param selectedColor The selected color
      */
     public void showColorSelectionNotification(String playerName, CardColor selectedColor) {
-        ActionNotification notification = ActionNotification.createColorChangeNotification(playerName, selectedColor);
-        showNotification(notification);
+        // Run on JavaFX thread to avoid threading issues
+        Platform.runLater(() -> {
+            // Create the notification
+            ActionNotification notification = ActionNotification.createColorChangeNotification(playerName, selectedColor);
+            
+            // Center position in parent pane
+            StackPane notificationPane = notification.getNotificationPane();
+            notificationPane.setLayoutX((parentPane.getWidth() - notificationPane.getPrefWidth()) / 2);
+            notificationPane.setLayoutY(180); // Position below any other notifications
+            
+            // Add to parent and show
+            parentPane.getChildren().add(notificationPane);
+            notification.show();
+        });
     }
     
     /**
-     * Shows a notification about a game action.
+     * Shows a UNO call notification.
      * 
-     * @param playerName The player's name
-     * @param actionMessage The action message
+     * @param playerName The name of the player calling UNO
      */
-    public void showActionNotification(String playerName, String actionMessage) {
-        ActionNotification notification = new ActionNotification(playerName, actionMessage);
-        showNotification(notification);
-    }
-    
-    /**
-     * Displays a notification in the game pane.
-     * 
-     * @param notification The notification to display
-     */
-    private void showNotification(ActionNotification notification) {
-        // Add the notification to the game pane
-        StackPane notificationPane = notification.getNotificationPane();
-        gamePane.getChildren().add(notificationPane);
-        
-        // Position the notification at the top center of the game pane
-        notificationPane.setLayoutX((gamePane.getWidth() - notificationPane.getMaxWidth()) / 2);
-        notificationPane.setLayoutY(50);
-        
-        // Show the notification
-        notification.show();
+    public void showUnoCallNotification(String playerName) {
+        // Run on JavaFX thread to avoid threading issues
+        Platform.runLater(() -> {
+            // Create the notification
+            ActionNotification notification = ActionNotification.createUnoCallNotification(playerName);
+            
+            // Center position in parent pane
+            StackPane notificationPane = notification.getNotificationPane();
+            notificationPane.setLayoutX((parentPane.getWidth() - notificationPane.getPrefWidth()) / 2);
+            notificationPane.setLayoutY(100); // Position notification near the top of the screen
+            
+            // Add to parent and show
+            parentPane.getChildren().add(notificationPane);
+            notification.show();
+        });
     }
     
     /**
@@ -82,45 +101,40 @@ public class NotificationManager {
      * @return A message describing the card's action or null if no notification should be shown
      */
     public String getActionMessage(Card card, String playerName, String targetPlayerName) {
-        // ONLY show notifications for action cards, NOT for number cards
-        if (!card.isActionCard()) {
-            return null; // Return null to indicate no notification should be shown
+        if (card == null) {
+            return null;
         }
         
+        // Determine message based on card action
         switch (card.getAction()) {
             case SKIP:
-                return "plays " + card.getColor() + " Skip! " + targetPlayerName + "'s turn is skipped";
+                return "skips " + targetPlayerName + "'s turn";
                 
             case REVERSE:
-                if (isTwoPlayerGame()) {
-                    // In 2-player game, Reverse acts like Skip
-                    return "plays " + card.getColor() + " Reverse! " + targetPlayerName + "'s turn is skipped";
-                } else {
-                    return "plays " + card.getColor() + " Reverse! Direction is changed";
-                }
+                return "reverses direction";
                 
             case DRAW_TWO:
-                return "plays " + card.getColor() + " Draw Two! " + targetPlayerName + " draws 2 cards";
-                
-            case WILD:
-                // Color change notification is handled separately
-                return null;
+                return "makes " + targetPlayerName + " draw 2 cards";
                 
             case WILD_DRAW_FOUR:
-                return "plays Wild Draw Four! " + targetPlayerName + " draws 4 cards";
+                return "makes " + targetPlayerName + " draw 4 cards";
+                
+            case WILD:
+                if (card.getColor() == CardColor.MULTI) {
+                    return "plays a WILD card";
+                } else {
+                    return "color is now " + card.getColor();
+                }
                 
             default:
-                return null; // Return null for any other cards that don't need notifications
+                // Don't show notifications for regular number cards
+                if (card.isNumberCard()) {
+                    return null;
+                }
+                
+                // For any other unknown action
+                return "plays " + card.toString();
         }
-    }
-    
-    /**
-     * Helper method to determine if we're in a two-player game.
-     * This would typically be provided by the Game model.
-     */
-    private boolean isTwoPlayerGame() {
-        // This is a placeholder - in real code, this would check the actual player count
-        return false;
     }
     
     /**

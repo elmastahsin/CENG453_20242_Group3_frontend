@@ -5,6 +5,7 @@ import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import metu.ceng.ceng453_20242_group3_frontend.features.game.model.Card;
 import metu.ceng.ceng453_20242_group3_frontend.features.game.model.CardAction;
@@ -255,8 +256,17 @@ public class AIPlayerController {
                 notificationManager.showUnoCallNotification(aiPlayer.getName());
             }
             
-            // Notify card played
-            cardPlayCallback.onCardPlayed(aiIndex, card);
+            // For DRAW_TWO and WILD_DRAW_FOUR cards, force an immediate callback update
+            // to ensure the UI gets updated to show the drawn cards
+            if (card.getAction() == CardAction.DRAW_TWO || card.getAction() == CardAction.WILD_DRAW_FOUR) {
+                // Additional delay to ensure cards are drawn before update
+                PauseTransition updateDelay = new PauseTransition(Duration.millis(500));
+                updateDelay.setOnFinished(e -> cardPlayCallback.onCardPlayed(aiIndex, card));
+                updateDelay.play();
+            } else {
+                // Notify card played immediately for other card types
+                cardPlayCallback.onCardPlayed(aiIndex, card);
+            }
             
             // Check for game over
             if (game.isGameEnded()) {
@@ -305,13 +315,22 @@ public class AIPlayerController {
         if (drawnCard != null && drawnCard.isPlayable()) {
             System.out.println("AI drew a playable card: " + drawnCard + ". Playing it now.");
             
-            // Show notification about drawing a playable card
-            notificationManager.showActionNotification(aiPlayer.getName(), "drew a card and will play it");
+            // Update the UI immediately to show the drawn card
+            cardPlayCallback.onCardDrawn();
             
-            // Small delay before playing the drawn card
-            PauseTransition pause = new PauseTransition(Duration.millis(2000));
+            // Show a special notification for drawn playable card using a highlighted style
+            notificationManager.showActionNotification(aiPlayer.getName(), "drew a card and can play it");
+            
+            // Use a longer delay before playing the drawn card so players can clearly see what was drawn
+            PauseTransition pause = new PauseTransition(Duration.millis(3500));
             pause.setOnFinished(e -> {
-                playAICard(aiIndex, drawnCard);
+                // Show another notification when the AI actually plays the card
+                notificationManager.showActionNotification(aiPlayer.getName(), "plays drawn card: " + drawnCard.toString());
+                
+                // Add a small delay after the notification before playing the card
+                PauseTransition playDelay = new PauseTransition(Duration.millis(1000));
+                playDelay.setOnFinished(event -> playAICard(aiIndex, drawnCard));
+                playDelay.play();
             });
             pause.play();
         } else {
@@ -336,55 +355,36 @@ public class AIPlayerController {
     }
 
     /**
-     * Finds the best card for the AI to play from its hand.
-     * Uses a strategy to play the most effective card.
+     * Finds a card for the AI to play from its hand.
+     * Randomly selects from the available playable cards.
      * 
      * @param playerHand   The AI player's hand
      * @param currentColor The current game color
      * @return The card to play, or null if no playable card
      */
     public Card selectCardToPlay(List<Card> playerHand, CardColor currentColor) {
-        // First try to play a non-wild card that matches the current color
+        // First collect all playable cards
+        List<Card> playableCards = new ArrayList<>();
+        
         for (Card card : playerHand) {
-            if (card.isPlayable() && !card.isWildCard() && card.getColor() == currentColor) {
-                System.out.println("AI selecting matching color card: " + card);
-                return card;
+            if (card.isPlayable()) {
+                playableCards.add(card);
+                System.out.println("AI found playable card: " + card);
             }
         }
         
-        // Then try to play a number card that matches the top card's number
-        for (Card card : playerHand) {
-            if (card.isPlayable() && card.isNumberCard()) {
-                System.out.println("AI selecting matching number card: " + card);
-                return card;
-            }
+        // If no playable cards, return null
+        if (playableCards.isEmpty()) {
+            System.out.println("AI couldn't find any playable cards");
+            return null;
         }
         
-        // Then try action cards
-        for (Card card : playerHand) {
-            if (card.isPlayable() && card.isActionCard() && !card.isWildCard()) {
-                System.out.println("AI selecting action card: " + card);
-                return card;
-            }
-        }
+        // Select a random card from the playable cards
+        Random random = new Random();
+        int randomIndex = random.nextInt(playableCards.size());
+        Card selectedCard = playableCards.get(randomIndex);
         
-        // Try regular wild cards
-        for (Card card : playerHand) {
-            if (card.isPlayable() && card.getAction() == CardAction.WILD) {
-                System.out.println("AI selecting WILD card: " + card);
-                return card;
-            }
-        }
-        
-        // Finally try WILD_DRAW_FOUR if it's playable
-        for (Card card : playerHand) {
-            if (card.isPlayable() && card.getAction() == CardAction.WILD_DRAW_FOUR) {
-                System.out.println("AI selecting WILD_DRAW_FOUR: " + card);
-                return card;
-            }
-        }
-        
-        System.out.println("AI couldn't find any playable cards");
-        return null;
+        System.out.println("AI randomly selected: " + selectedCard + " from " + playableCards.size() + " playable cards");
+        return selectedCard;
     }
 }

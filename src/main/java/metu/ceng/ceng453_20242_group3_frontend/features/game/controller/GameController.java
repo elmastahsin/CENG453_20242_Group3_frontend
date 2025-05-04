@@ -268,7 +268,7 @@ public class GameController {
                 card.setPlayable(true);
             }
         }
-
+        
         // Update the UI with initial game state
         updateUI();
         
@@ -383,7 +383,7 @@ public class GameController {
         
         // Add click event to draw a card
         cardBackView.setOnMouseClicked(event -> {
-            drawCard();
+                drawCard();
         });
         
         drawPileContainer.getChildren().add(cardBackView);
@@ -652,6 +652,12 @@ public class GameController {
                     
                     // Update UNO indicators
                     updateUnoIndicators();
+                    
+                    // For DRAW_TWO and WILD_DRAW_FOUR cards, force an immediate UI update 
+                    // to show the drawn cards in opponent hands
+                    if (card.getAction() == CardAction.DRAW_TWO || card.getAction() == CardAction.WILD_DRAW_FOUR) {
+                        updateUI();
+                    }
                 }
             });
             
@@ -668,8 +674,8 @@ public class GameController {
             }
             
             // Update playable cards
-            updatePlayableCards();
-            
+                updatePlayableCards();
+                
             // Handle AI turns
             aiPlayerController.handleAITurns();
         }
@@ -757,7 +763,7 @@ public class GameController {
             
             // For wild cards, use the special card renderer with color indicator
             if (topCard.isWildCard()) {
-                cardView = CardRenderer.createWildCardWithSelectedColor(topCard, game.getCurrentColor());
+                    cardView = CardRenderer.createWildCardWithSelectedColor(topCard, game.getCurrentColor());
                 
                 // Add a slight rotation for visual interest
                 cardView.setRotate(-5 + (Math.random() * 10));
@@ -855,11 +861,11 @@ public class GameController {
                     
                     // Show a notification that the card is not playable
                     notificationManager.showActionNotification("System", "The drawn card cannot be played. Turn passed.");
-                    
-                    // Update turn label
-                    updateTurnLabel();
-                    
-                    // Check if an automatic move is needed for AI
+                
+                // Update turn label
+                updateTurnLabel();
+                
+                // Check if an automatic move is needed for AI
                     aiPlayerController.handleAITurns();
                 }
             });
@@ -898,23 +904,23 @@ public class GameController {
         
         // Use Platform.runLater to show the dialog after animation completes
         Platform.runLater(() -> {
-            // Create alert dialog
-            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-                javafx.scene.control.Alert.AlertType.INFORMATION
-            );
-            
-            alert.setTitle("Game Over");
-            
-            if (isPlayerWinner) {
-                alert.setHeaderText("You Win!");
-                alert.setContentText("Congratulations, you have won the game!");
-            } else {
-                alert.setHeaderText("You Lose!");
-                alert.setContentText("Better luck next time!");
-            }
-            
-            // Show dialog and return to main menu when closed
-            alert.showAndWait().ifPresent(response -> exitGame());
+        // Create alert dialog
+        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+            javafx.scene.control.Alert.AlertType.INFORMATION
+        );
+        
+        alert.setTitle("Game Over");
+        
+        if (isPlayerWinner) {
+            alert.setHeaderText("You Win!");
+            alert.setContentText("Congratulations, you have won the game!");
+        } else {
+            alert.setHeaderText("You Lose!");
+            alert.setContentText("Better luck next time!");
+        }
+        
+        // Show dialog and return to main menu when closed
+        alert.showAndWait().ifPresent(response -> exitGame());
         });
     }
     

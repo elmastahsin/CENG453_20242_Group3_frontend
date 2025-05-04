@@ -116,6 +116,16 @@ public class ActionNotification {
             colorIndicator.setStrokeWidth(1);
             
             content.getChildren().addAll(colorIndicator, textLabel);
+        } else if (actionMessage.contains("drew a card and can play it")) {
+            // Special notification for AI drawing a playable card
+            Rectangle cardDrawnIcon = new Rectangle(40, 40);
+            cardDrawnIcon.setArcWidth(8);
+            cardDrawnIcon.setArcHeight(8);
+            cardDrawnIcon.setFill(Color.rgb(50, 205, 50)); // Green for good luck/success
+            cardDrawnIcon.setStroke(Color.WHITE);
+            cardDrawnIcon.setStrokeWidth(2);
+            
+            content.getChildren().addAll(cardDrawnIcon, textLabel);
         } else {
             // For all other actions (Skip, Reverse, Draw), just show the text without an icon
             content.getChildren().add(textLabel);
@@ -177,6 +187,16 @@ public class ActionNotification {
      */
     public static ActionNotification createUnoCallNotification(String playerName) {
         return new ActionNotification(playerName, "calls UNO!", true);
+    }
+    
+    /**
+     * Creates a special notification for when AI draws a playable card.
+     * 
+     * @param playerName The name of the AI player
+     * @return A configured action notification for drawn playable card
+     */
+    public static ActionNotification createDrawnPlayableCardNotification(String playerName) {
+        return new ActionNotification(playerName, "drew a card and can play it", true);
     }
     
     /**
