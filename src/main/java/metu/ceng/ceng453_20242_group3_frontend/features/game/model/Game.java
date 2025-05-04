@@ -40,112 +40,82 @@ public class Game {
         this.players = new ArrayList<>();
         this.drawPile = Deck.createStandardDeck();
         this.discardPile = new Deck();
-        this.direction = Direction.COUNTER_CLOCKWISE; // FORCE COUNTER_CLOCKWISE DIRECTION
+        this.direction = Direction.COUNTER_CLOCKWISE;
         this.currentPlayerIndex = 0;
         this.gameStarted = false;
         this.gameEnded = false;
         this.winner = null;
         this.random = new Random();
-        this.currentColor = null; // Will be set when first card is played
+        this.currentColor = null;
 
         System.out.println("### GAME CREATED WITH DIRECTION: " + this.direction + " ###");
     }
 
-    /**
-     * Gets the unique ID of the game.
-     *
-     * @return The game ID
-     */
+    /* === Getters and basic methods === */
+
     public String getGameId() {
         return gameId;
     }
 
-    /**
-     * Gets the game mode.
-     *
-     * @return The game mode
-     */
     public GameMode getGameMode() {
         return gameMode;
     }
 
-    /**
-     * Gets the number of players.
-     *
-     * @return The player count
-     */
     public PlayerCount getPlayerCount() {
         return playerCount;
     }
 
-    /**
-     * Gets the list of players.
-     *
-     * @return The list of players
-     */
     public List<Player> getPlayers() {
         return new ArrayList<>(players);
     }
 
-    /**
-     * Gets the draw pile.
-     *
-     * @return The draw pile
-     */
     public Deck getDrawPile() {
         return drawPile;
     }
 
-    /**
-     * Gets the discard pile.
-     *
-     * @return The discard pile
-     */
     public Deck getDiscardPile() {
         return discardPile;
     }
 
-    /**
-     * Checks if the discard pile is empty.
-     *
-     * @return true if the discard pile is empty, false otherwise
-     */
     public boolean isDiscardPileEmpty() {
         return discardPile == null || discardPile.isEmpty();
     }
 
-    /**
-     * Gets the current direction of play.
-     *
-     * @return The direction
-     */
     public Direction getDirection() {
         return direction;
     }
 
-    /**
-     * Sets the direction of play.
-     *
-     * @param direction The new direction
-     */
     public void setDirection(Direction direction) {
         this.direction = direction;
     }
 
-    /**
-     * Gets the current game color (important for wild cards).
-     *
-     * @return The current game color
-     */
+    public int getCurrentPlayerIndex() {
+        return currentPlayerIndex;
+    }
+
+    public Player getCurrentPlayer() {
+        if (players.isEmpty()) {
+            return null;
+        }
+        return players.get(currentPlayerIndex);
+    }
+
+    public Player getPlayerByIndex(int index) {
+        if (index < 0 || index >= players.size()) {
+            System.out.println("Invalid player index: " + index);
+            return null;
+        }
+        return players.get(index);
+    }
+
     public CardColor getCurrentColor() {
+        Card topCard = discardPile.peekCard();
+        if (topCard != null && topCard.getColor() != CardColor.MULTI) {
+            return topCard.getColor();
+        }
         return currentColor;
     }
 
-    /**
-     * Sets the current game color (used after playing wild cards).
-     *
-     * @param color The new game color
-     */
     public void setCurrentColor(CardColor color) {
         if (color != CardColor.MULTI) {
             CardColor oldColor = this.currentColor;
@@ -156,102 +126,6 @@ public class Game {
         }
     }
 
-    /**
-     * Gets the index of the current player.
-     *
-     * @return The current player index
-     */
-    public int getCurrentPlayerIndex() {
-        return currentPlayerIndex;
-    }
-
-    /**
-     * Gets the current player.
-     *
-     * @return The current player
-     */
-    public Player getCurrentPlayer() {
-        if (players.isEmpty()) {
-            return null;
-        }
-        return players.get(currentPlayerIndex);
-    }
-
-    /**
-     * Updates which cards in the current player's hand are playable
-     * based on the top card of the discard pile.
-     */
-    public void updatePlayableCards() {
-        if (!gameStarted || gameEnded || players.isEmpty()) {
-            return;
-        }
-
-        Player currentPlayer = getCurrentPlayer();
-        Card topCard = discardPile.peekCard();
-
-        if (topCard == null) {
-            // If no cards in discard pile yet, all cards are playable
-            for (Card card : currentPlayer.getHand()) {
-                card.setPlayable(true);
-            }
-            return;
-        }
-
-        System.out.println("Updating playable cards for " + currentPlayer.getName());
-        System.out.println("Top card: " + topCard + ", Current color: " + currentColor);
-
-        // First check if the player has any cards matching the current color
-        // This is needed for Wild Draw Four validation
-        boolean hasMatchingColorCard = false;
-        for (Card card : currentPlayer.getHand()) {
-            if (card.getColor() == currentColor && card.getColor() != CardColor.MULTI) {
-                hasMatchingColorCard = true;
-                System.out.println("Player has matching color card: " + card);
-                break;
-            }
-        }
-
-        // Then determine which cards are playable
-        for (Card card : currentPlayer.getHand()) {
-            boolean playable = false;
-
-            if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
-                // Wild Draw Four can only be played if the player has no cards matching the current color
-                playable = !hasMatchingColorCard;
-                if (!playable) {
-                    System.out.println("Card not playable (has matching color cards): " + card);
-                }
-            } else if (card.getAction() == CardAction.WILD) {
-                // Regular wild cards can always be played
-                playable = true;
-            } else if (card.getColor() == currentColor) {
-                // Cards matching the current color can be played
-                playable = true;
-            } else if (topCard.isNumberCard() && card.isNumberCard() && topCard.getValue() == card.getValue()) {
-                // Number cards matching the top card's value can be played
-                playable = true;
-            } else if (topCard.isActionCard() && card.isActionCard() && topCard.getAction() == card.getAction()
-                    && !card.isWildCard() && !topCard.isWildCard()) {
-                // Action cards matching the top card's action can be played (except wilds)
-                playable = true;
-            }
-
-            // Update the card's playable status
-            card.setPlayable(playable);
-
-            // Debug output
-            if (playable) {
-                System.out.println("Playable card: " + card);
-            }
-        }
-    }
-
-    /**
-     * Adds a player to the game.
-     *
-     * @param player The player to add
-     * @return true if the player was added, false otherwise
-     */
     public boolean addPlayer(Player player) {
         if (players.size() >= playerCount.getCount()) {
             return false;
@@ -259,32 +133,194 @@ public class Game {
         return players.add(player);
     }
 
-    /**
-     * Checks if the game has started.
-     *
-     * @return true if the game has started, false otherwise
-     */
     public boolean isGameStarted() {
         return gameStarted;
     }
 
-    /**
-     * Checks if the game has ended.
-     *
-     * @return true if the game has ended, false otherwise
-     */
     public boolean isGameEnded() {
         return gameEnded;
     }
 
-    /**
-     * Gets the winner of the game.
-     *
-     * @return The winner, or null if there is no winner yet
-     */
     public Player getWinner() {
         return winner;
     }
+
+    /* === Game state helper methods === */
+
+    /**
+     * Checks if the game is currently active (started but not ended)
+     * 
+     * @return true if the game is active, false otherwise
+     */
+    private boolean isGameActive() {
+        return gameStarted && !gameEnded;
+    }
+
+    /**
+     * Declares a player as the winner and ends the game.
+     * 
+     * @param player The winning player
+     */
+    private void declareWinner(Player player) {
+        gameEnded = true;
+        winner = player;
+        System.out.println("Player " + player.getName() + " has won the game!");
+    }
+
+    /* === Card playability methods === */
+
+    /**
+     * Updates which cards in the current player's hand are playable
+     * based on the top card of the discard pile.
+     */
+    public void updatePlayableCards() {
+        if (!isGameActive() || players.isEmpty()) {
+            return;
+        }
+
+        Player currentPlayer = getCurrentPlayer();
+        Card topCard = discardPile.peekCard();
+        CardColor currentGameColor = getCurrentColor();
+
+        System.out.println("Updating playable cards for " + currentPlayer.getName());
+        System.out.println("Top card: " + topCard + ", Current color: " + currentGameColor);
+
+        // Special case: If no cards in discard pile yet
+        if (topCard == null) {
+            setAllCardsPlayableExceptWildDrawFour(currentPlayer);
+            return;
+        }
+
+        // Check if the player has any cards matching the current color
+        boolean hasMatchingColorCard = checkForMatchingColorCards(currentPlayer, currentGameColor);
+
+        // Determine which cards are playable
+        updateCardPlayability(currentPlayer, topCard, currentGameColor, hasMatchingColorCard);
+    }
+
+    /**
+     * Sets all cards playable except Wild Draw Four.
+     * Used when the discard pile is empty.
+     * 
+     * @param player The player whose cards to update
+     */
+    private void setAllCardsPlayableExceptWildDrawFour(Player player) {
+        for (Card card : player.getHand()) {
+            card.setPlayable(card.getAction() != CardAction.WILD_DRAW_FOUR);
+        }
+    }
+
+    /**
+     * Checks if the player has any cards matching the current color.
+     * 
+     * @param player       The player to check
+     * @param currentColor The current game color
+     * @return true if the player has matching color cards, false otherwise
+     */
+    private boolean checkForMatchingColorCards(Player player, CardColor currentColor) {
+        for (Card card : player.getHand()) {
+            if (card.getColor() != CardColor.MULTI && card.getColor() == currentColor) {
+                System.out.println("Player has matching color card: " + card);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Updates the playability of each card in the player's hand.
+     * 
+     * @param player               The player whose cards to update
+     * @param topCard              The top card of the discard pile
+     * @param currentColor         The current game color
+     * @param hasMatchingColorCard Whether the player has cards matching the current
+     *                             color
+     */
+    private void updateCardPlayability(Player player, Card topCard, CardColor currentColor,
+            boolean hasMatchingColorCard) {
+        for (Card card : player.getHand()) {
+            boolean playable = determineIfCardIsPlayable(card, topCard, currentColor, hasMatchingColorCard);
+            card.setPlayable(playable);
+        }
+    }
+
+    /**
+     * Determines if a specific card is playable.
+     * 
+     * @param card                 The card to check
+     * @param topCard              The top card of the discard pile
+     * @param currentColor         The current game color
+     * @param hasMatchingColorCard Whether the player has cards matching the current
+     *                             color
+     * @return true if the card is playable, false otherwise
+     */
+    private boolean determineIfCardIsPlayable(Card card, Card topCard, CardColor currentColor,
+            boolean hasMatchingColorCard) {
+        // Wild Draw Four can only be played if the player has no matching color cards
+        if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
+            boolean playable = !hasMatchingColorCard;
+            if (!playable) {
+                System.out.println("Card not playable (has matching color cards): " + card);
+            }
+            return playable;
+        }
+
+        // Regular wild cards can always be played
+        if (card.getAction() == CardAction.WILD) {
+            return true;
+        }
+
+        // Cards matching the current color can be played
+        if (card.getColor() == currentColor) {
+            return true;
+        }
+
+        // Number cards matching the top card's value can be played
+        if (topCard.isNumberCard() && card.isNumberCard() && topCard.getValue() == card.getValue()) {
+            return true;
+        }
+
+        // Action cards matching the top card's action can be played (except wilds)
+        if (topCard.isActionCard() && card.isActionCard() && topCard.getAction() == card.getAction()
+                && !card.isWildCard() && !topCard.isWildCard()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks if a card would be playable given the current game state.
+     * Used for validating cards that are drawn or played.
+     *
+     * @param card The card to check
+     * @return true if the card is playable, false otherwise
+     */
+    public boolean isCardPlayable(Card card) {
+        Card topCard = discardPile.peekCard();
+        CardColor currentGameColor = getCurrentColor();
+
+        // If no top card, all non-Wild Draw Four cards are playable
+        if (topCard == null) {
+            return card.getAction() != CardAction.WILD_DRAW_FOUR;
+        }
+
+        // Check if player has any cards of the current color (for Wild Draw Four
+        // validation)
+        Player currentPlayer = getCurrentPlayer();
+        boolean hasMatchingColorCard = false;
+
+        for (Card c : currentPlayer.getHand()) {
+            if (c != card && c.getColor() != CardColor.MULTI && c.getColor() == currentGameColor) {
+                hasMatchingColorCard = true;
+                break;
+            }
+        }
+
+        return determineIfCardIsPlayable(card, topCard, currentGameColor, hasMatchingColorCard);
+    }
+
+    /* === Game flow control methods === */
 
     /**
      * Starts the game.
@@ -292,27 +328,16 @@ public class Game {
      * @return true if the game was started, false otherwise
      */
     public boolean startGame() {
-        // Check if we have enough players
-        if (players.size() < playerCount.getCount()) {
+        if (players.size() < playerCount.getCount() || gameStarted) {
             return false;
         }
 
-        // Check if the game has already started
-        if (gameStarted) {
-            return false;
-        }
-
-        // Deal cards to players
         dealInitialCards();
 
-        // Always start with human player (index 0)
-        currentPlayerIndex = 0;
         System.out.println("Game starting with player: " + players.get(currentPlayerIndex).getName());
         System.out.println("Initial direction: " + direction);
 
-        // Set the game as started
         gameStarted = true;
-
         return true;
     }
 
@@ -338,18 +363,42 @@ public class Game {
     public Player nextPlayer() {
         System.out.println("===== MOVING TO NEXT PLAYER =====");
         System.out.println("Current direction: " + direction);
-        System.out.println("Current player index: " + currentPlayerIndex + " (" + getCurrentPlayer().getName() + ")");
 
-        int oldIndex = currentPlayerIndex;
+        int previousPlayerIndex = currentPlayerIndex;
+        currentPlayerIndex = getNextPlayerIndex();
 
-        if (direction == Direction.CLOCKWISE) {
-            currentPlayerIndex = (currentPlayerIndex - 1 + players.size()) % players.size();
-        } else {
-            currentPlayerIndex = (currentPlayerIndex + 1) % players.size();
-        }
-
+        System.out.println("Player index changed from: " + previousPlayerIndex + " to: " + currentPlayerIndex);
         System.out.println("===== NEXT PLAYER MOVEMENT COMPLETE =====");
         return getCurrentPlayer();
+    }
+
+    /**
+     * Calculates the next player index without changing the current player.
+     * 
+     * @return The next player index
+     */
+    private int getNextPlayerIndex() {
+        if (direction == Direction.CLOCKWISE) {
+            return (currentPlayerIndex - 1 + players.size()) % players.size();
+        } else {
+            return (currentPlayerIndex + 1) % players.size();
+        }
+    }
+
+    /**
+     * Gets the player who would be next in turn.
+     * Useful for determining who is affected by action cards.
+     *
+     * @return The next player in turn sequence
+     */
+    public Player getNextPlayer() {
+        if (players.isEmpty()) {
+            return null;
+        }
+
+        int nextPlayerIndex = getNextPlayerIndex();
+        System.out.println("Next player would be index: " + nextPlayerIndex);
+        return players.get(nextPlayerIndex);
     }
 
     /**
@@ -359,13 +408,11 @@ public class Game {
      */
     public Player skipPlayer() {
         // Skip once to move past the next player
-        System.out.println("Skipping player - first move from index: " + currentPlayerIndex);
         Player skippedPlayer = nextPlayer();
-        System.out.println("Skipped to index: " + currentPlayerIndex + " (player: " + skippedPlayer.getName() + ")");
-
         // Skip again to move to the player after the skipped one
         Player finalPlayer = nextPlayer();
-        System.out.println("Continued to next player index: " + currentPlayerIndex + " (player: " + finalPlayer.getName() + ")");
+        System.out.println("Skipped player: " + skippedPlayer.getName() +
+                ", Current player is now: " + finalPlayer.getName());
 
         return finalPlayer;
     }
@@ -375,15 +422,11 @@ public class Game {
      */
     public void reverseDirection() {
         Direction oldDirection = direction;
-
-        if (direction == Direction.CLOCKWISE) {
-            direction = Direction.COUNTER_CLOCKWISE;
-        } else {
-            direction = Direction.CLOCKWISE;
-        }
-
-        System.out.println("!!! DIRECTION REVERSED from " + oldDirection + " to " + direction + " !!!");
+        direction = (direction == Direction.CLOCKWISE) ? Direction.COUNTER_CLOCKWISE : Direction.CLOCKWISE;
+        System.out.println("Direction changed from: " + oldDirection + " to: " + direction);
     }
+
+    /* === Card handling methods === */
 
     /**
      * Plays a card from the current player's hand.
@@ -394,60 +437,31 @@ public class Game {
     public boolean playCard(Card card) {
         Player currentPlayer = getCurrentPlayer();
 
-        // Check if the game has started
-        if (!gameStarted || gameEnded) {
+        // Check if the game is active and player has the card
+        if (!isGameActive() || !currentPlayer.getHand().contains(card)) {
             return false;
         }
 
-        // Check if the player has the card
-        if (!currentPlayer.getHand().contains(card)) {
-            return false;
-        }
+        updatePlayableCards();
 
-        System.out.println("Player " + currentPlayer.getName() + " is playing: " + card +
-                ", Current color before play: " + currentColor);
-
-        // Make sure the card is playable according to UNO rules
-        if (!isCardPlayable(card)) {
+        // Check if the card is playable
+        if (!card.isPlayable()) {
             System.out.println("Card is not playable: " + card);
             return false;
         }
 
-        // Remove the card from player's hand
+        // Remove the card from player's hand and add to discard pile
         if (!currentPlayer.removeCard(card)) {
             return false;
         }
-
-        // Add the card to the discard pile
         discardPile.addCard(card);
 
-        // Handle the color based on card type
-        if (card.isWildCard()) {
-            // Wild cards - color should already be set by the UI
-            // For AI players, choose a random color if not already set
-            if (currentPlayer.isAI()) {
-                CardColor[] possibleColors = {
-                        CardColor.RED, CardColor.BLUE, CardColor.GREEN, CardColor.YELLOW
-                };
+        // Handle card color
+        handleCardColor(card, currentPlayer);
 
-                // If color hasn't been set yet, set it now
-                if (this.currentColor == null || this.currentColor == CardColor.MULTI) {
-                    CardColor randomColor = possibleColors[random.nextInt(possibleColors.length)];
-                    System.out.println("AI player setting wild card color to: " + randomColor);
-                    setCurrentColor(randomColor);
-                }
-            }
-            // Note: For human players the color is set in the UI before calling playCard
-        } else {
-            // For regular cards (including action cards), set current color to card's color
-            System.out.println("Setting color to card's color: " + card.getColor());
-            setCurrentColor(card.getColor());
-        }
-
-        // Check if the player has won
+        // Check for winner
         if (currentPlayer.getCardCount() == 0) {
-            gameEnded = true;
-            winner = currentPlayer;
+            declareWinner(currentPlayer);
             return true;
         }
 
@@ -456,11 +470,8 @@ public class Game {
             currentPlayer.setHasCalledUno(true);
         }
 
-        // Handle special cards
-        handleSpecialCard(card);
-
-        // Update which cards are playable for the new current player
-        updatePlayableCards();
+        // Handle special card actions
+        handleCardAction(card);
 
         System.out.println("After play: Current color is now: " + currentColor +
                 ", Current player is now: " + getCurrentPlayer().getName());
@@ -468,55 +479,35 @@ public class Game {
     }
 
     /**
-     * Checks if a card is playable according to UNO rules.
-     *
-     * @param card The card to check
-     * @return true if the card can be played, false otherwise
+     * Handles the color logic when a card is played.
+     * 
+     * @param card   The card that was played
+     * @param player The player who played the card
      */
-    private boolean isCardPlayable(Card card) {
-        Card topCard = discardPile.peekCard();
-
-        // If this is the first card (no cards in discard pile), any card can be played
-        if (topCard == null || discardPile.isEmpty()) {
-            System.out.println("Discard pile is empty, any card can be played");
-            return true;
-        }
-
-        // Wild cards can always be played except for Wild Draw Four
-        if (card.getAction() == CardAction.WILD) {
-            return true;
-        }
-
-        // Wild Draw Four can only be played if the player has no cards matching the current color
-        if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
-            Player currentPlayer = getCurrentPlayer();
-            for (Card playerCard : currentPlayer.getHand()) {
-                if (playerCard != card && playerCard.getColor() == currentColor && playerCard.getColor() != CardColor.MULTI) {
-                    System.out.println("Cannot play Wild Draw Four - player has a card matching the current color: " + playerCard);
-                    return false; // Player has a card matching the current color
-                }
+    private void handleCardColor(Card card, Player player) {
+        if (card.isWildCard()) {
+            // For AI players, choose a random color if not already set
+            if (player.isAI()) {
+                setRandomColorForAI();
             }
-            return true;
+            // For human players, color is set in UI before calling playCard
+        } else {
+            // For regular cards, set current color to card's color
+            System.out.println("Setting color to card's color: " + card.getColor());
+            setCurrentColor(card.getColor());
         }
+    }
 
-        // Cards of the same color as the current game color can be played
-        if (card.getColor() == currentColor) {
-            return true;
-        }
-
-        // Cards with the same number as the top card can be played
-        if (topCard.isNumberCard() && card.isNumberCard() && topCard.getValue() == card.getValue()) {
-            return true;
-        }
-
-        // Action cards with the same action can be played (except wild cards)
-        if (topCard.isActionCard() && card.isActionCard() &&
-                topCard.getAction() == card.getAction() &&
-                !topCard.isWildCard() && !card.isWildCard()) {
-            return true;
-        }
-
-        return false;
+    /**
+     * Sets a random color for AI players when they play wild cards.
+     */
+    private void setRandomColorForAI() {
+        CardColor[] possibleColors = {
+                CardColor.RED, CardColor.BLUE, CardColor.GREEN, CardColor.YELLOW
+        };
+        CardColor randomColor = possibleColors[random.nextInt(possibleColors.length)];
+        System.out.println("AI player setting wild card color to: " + randomColor);
+        setCurrentColor(randomColor);
     }
 
     /**
@@ -524,76 +515,35 @@ public class Game {
      *
      * @param card The card that was played
      */
-    private void handleSpecialCard(Card card) {
+    private void handleCardAction(Card card) {
         System.out.println("Handling special card: " + card +
                 ", Current color: " + currentColor +
                 ", Current player: " + getCurrentPlayer().getName());
 
-        // If it's a number card or a wild card without draw, just move to the next player
+        // If it's a number card or a wild card without draw, just move to the next
+        // player
         if (card.isNumberCard() || card.getAction() == CardAction.WILD) {
             Player nextP = nextPlayer();
             System.out.println("Moving to next player: " + nextP.getName());
             return;
         }
 
-        // Handle action cards
+        // Handle action cards based on their type
         switch (card.getAction()) {
             case SKIP:
-                // Skip next player's turn
-                Player skippedTo = skipPlayer();
-                System.out.println("Skipped to player: " + skippedTo.getName() +
-                        ", Current color remains: " + currentColor);
+                handleSkipCard();
                 break;
 
             case REVERSE:
-                // Reverse the direction of play
-                Direction oldDirection = direction;
-                reverseDirection();
-                System.out.println("Direction changed from " + oldDirection + " to " + direction);
-
-                // In a two-player game, Reverse acts like Skip
-                if (players.size() == 2) {
-                    // After reversing, we need to do a nextPlayer to skip the other player
-                    Player reversedTo = nextPlayer();
-                    System.out.println("Two players only, Reverse acts like Skip. Now at player: " + reversedTo.getName());
-                } else {
-                    // In games with more than 2 players, just move to the next player
-                    // (which will be different due to reversed direction)
-                    Player reversedTo = nextPlayer();
-                    System.out.println("Moved to player in new direction: " + reversedTo.getName());
-                }
+                handleReverseCard();
                 break;
 
             case DRAW_TWO:
-                Player nextPlayer = nextPlayer();
-                System.out.println("Draw Two: Next player " + nextPlayer.getName() + " will draw 2 cards");
-                // Draw two cards for the next player
-                for (int i = 0; i < 2; i++) {
-                    Card drawnCard = drawCard();
-                    if (drawnCard != null) {
-                        nextPlayer.addCard(drawnCard);
-                        System.out.println("  - Drew card: " + drawnCard);
-                    }
-                }
-                // Skip the player who drew cards
-                Player skippedPlayer = nextPlayer();
-                System.out.println("Skipped player " + nextPlayer.getName() + ", new current player: " + skippedPlayer.getName());
+                handleDrawTwoCard();
                 break;
 
             case WILD_DRAW_FOUR:
-                nextPlayer = nextPlayer();
-                System.out.println("Wild Draw Four: Next player " + nextPlayer.getName() + " will draw 4 cards, current color: " + currentColor);
-                // Draw four cards for the next player
-                for (int i = 0; i < 4; i++) {
-                    Card drawnCard = drawCard();
-                    if (drawnCard != null) {
-                        nextPlayer.addCard(drawnCard);
-                        System.out.println("  - Drew card: " + drawnCard);
-                    }
-                }
-                // Skip the player who drew cards
-                skippedPlayer = nextPlayer();
-                System.out.println("Skipped player " + nextPlayer.getName() + ", new current player: " + skippedPlayer.getName());
+                handleWildDrawFourCard();
                 break;
 
             default:
@@ -607,35 +557,123 @@ public class Game {
     }
 
     /**
-     * Draws a card from the draw pile for the current player.
+     * Handles a Skip card action.
+     */
+    private void handleSkipCard() {
+        Player skippedTo = skipPlayer();
+        System.out.println("Skipped to player: " + skippedTo.getName() +
+                ", Current color remains: " + currentColor);
+    }
+
+    /**
+     * Handles a Reverse card action.
+     */
+    private void handleReverseCard() {
+        Direction oldDirection = direction;
+        reverseDirection();
+        System.out.println("Direction changed from " + oldDirection + " to " + direction);
+
+        // In a two-player game, Reverse acts like Skip
+        if (players.size() == 2) {
+            // After reversing, skip the other player
+            Player reversedTo = nextPlayer();
+            System.out.println("Two players only, Reverse acts like Skip. Now at player: " + reversedTo.getName());
+        } else {
+            // In games with more than 2 players, move to next player in new direction
+            Player reversedTo = nextPlayer();
+            System.out.println("Moved to player in new direction: " + reversedTo.getName());
+        }
+    }
+
+    /**
+     * Handles a Draw Two card action.
+     */
+    private void handleDrawTwoCard() {
+        Player nextPlayer = nextPlayer();
+        System.out.println("Draw Two: Next player " + nextPlayer.getName() + " will draw 2 cards");
+
+        // Draw two cards for the next player
+        drawCardsForPlayer(nextPlayer, 2);
+
+        // Skip the player who drew cards
+        Player skippedPlayer = nextPlayer();
+        System.out.println("Skipped player " + nextPlayer.getName() +
+                ", new current player: " + skippedPlayer.getName());
+    }
+
+    /**
+     * Handles a Wild Draw Four card action.
+     */
+    private void handleWildDrawFourCard() {
+        Player nextPlayer = nextPlayer();
+        System.out.println("Wild Draw Four: Next player " + nextPlayer.getName() +
+                " will draw 4 cards, current color: " + currentColor);
+
+        // Draw four cards for the next player
+        drawCardsForPlayer(nextPlayer, 4);
+
+        // Skip the player who drew cards
+        Player skippedPlayer = nextPlayer();
+        System.out.println("Skipped player " + nextPlayer.getName() +
+                ", new current player: " + skippedPlayer.getName());
+    }
+
+    /**
+     * Draw a specified number of cards for a player.
+     * 
+     * @param player The player who will receive the cards
+     * @param count  Number of cards to draw
+     */
+    private void drawCardsForPlayer(Player player, int count) {
+        for (int i = 0; i < count; i++) {
+            Card drawnCard = drawCard();
+            if (drawnCard != null) {
+                player.addCard(drawnCard);
+                System.out.println("  - Drew card: " + drawnCard);
+            }
+        }
+    }
+
+    /**
+     * Draws a card from the draw pile.
      *
      * @return The drawn card, or null if no card could be drawn
      */
     public Card drawCard() {
-        // If the draw pile is empty, shuffle the discard pile (except the top card)
-        // and make it the new draw pile
+        // If the draw pile is empty, recycle the discard pile
         if (drawPile.isEmpty() && discardPile.getSize() > 1) {
-            Card topCard = discardPile.drawCard(); // Save the top card
-            List<Card> cards = discardPile.getCards();
-            drawPile.addCards(cards);
-            drawPile.shuffle();
-            discardPile = new Deck(); // Create a new empty discard pile
-            discardPile.addCard(topCard); // Put the top card back
+            recycleDiscardPile();
         }
 
         return drawPile.drawCard();
     }
 
     /**
+     * Recycles the discard pile when the draw pile is empty.
+     * Keeps the top card in the discard pile and moves the rest to the draw pile.
+     */
+    private void recycleDiscardPile() {
+        Card topCard = discardPile.drawCard(); // Draw the top card from the discard pile
+        List<Card> cards = discardPile.getCards();
+        drawPile.addCards(cards);
+        drawPile.shuffle();
+        discardPile = new Deck(); // Create a new empty discard pile
+        discardPile.addCard(topCard); // Put the top card back
+    }
+
+    /**
      * Draws a card for the current player and adds it to their hand.
+     * For AI players, it will try to play the card if possible and advance the
+     * turn.
+     * For human players, it will just add the card to their hand and advance the
+     * turn.
      *
      * @return The drawn card, or null if no card could be drawn
      */
     public Card drawCardForCurrentPlayer() {
         Player currentPlayer = getCurrentPlayer();
 
-        // Check if the game has started
-        if (!gameStarted || gameEnded) {
+        if (!isGameActive()) {
             return null;
         }
 
@@ -660,6 +698,48 @@ public class Game {
     }
 
     /**
+     * Draws a card for the current player without advancing the turn.
+     * This is useful for human players when we want to check if the drawn card is
+     * playable before deciding whether to advance the turn.
+     *
+     * @return The drawn card, or null if no card could be drawn
+     */
+    public Card drawCardWithoutAdvancingTurn() {
+        Player currentPlayer = getCurrentPlayer();
+
+        if (!isGameActive()) {
+            return null;
+        }
+
+        Card card = drawCard();
+        if (card != null) {
+            currentPlayer.addCard(card);
+
+            // Update playable status of the drawn card
+            boolean playable = isCardPlayable(card);
+            card.setPlayable(playable);
+            System.out.println("Drawn card is " + (playable ? "playable: " : "not playable: ") + card);
+
+            // Update which cards are playable
+            updatePlayableCards();
+        }
+
+        return card;
+    }
+
+    /**
+     * Advances the turn to the next player after drawing a card.
+     * This should be called only if the human player decides not to play the drawn
+     * card.
+     */
+    public void advanceTurnAfterDraw() {
+        nextPlayer();
+        updatePlayableCards();
+    }
+
+    /* === Debug methods === */
+
+    /**
      * Gets the current UNO state as a string for debugging purposes.
      */
     @Override
@@ -670,7 +750,8 @@ public class Game {
         sb.append("Player Count: ").append(playerCount.getCount()).append("\n");
         sb.append("Direction: ").append(direction).append("\n");
         sb.append("Current Color: ").append(currentColor).append("\n");
-        sb.append("Current Player: ").append(getCurrentPlayer() != null ? getCurrentPlayer().getName() : "None").append("\n");
+        sb.append("Current Player: ").append(getCurrentPlayer() != null ? getCurrentPlayer().getName() : "None")
+                .append("\n");
         sb.append("Draw Pile: ").append(drawPile.getSize()).append(" cards\n");
         sb.append("Discard Pile: ").append(discardPile.getSize()).append(" cards\n");
         sb.append("Top Card: ").append(discardPile.peekCard()).append("\n");
@@ -686,28 +767,4 @@ public class Game {
 
         return sb.toString();
     }
-
-    /**
-     * Gets the player who would be next in turn.
-     * Useful for determining who is affected by action cards.
-     *
-     * @return The next player in turn sequence
-     */
-    public Player getNextPlayer() {
-        if (players.isEmpty()) {
-            return null;
-        }
-
-        // Calculate the next player index without changing the current player
-        int nextPlayerIndex;
-
-        if (direction == Direction.CLOCKWISE) {
-            nextPlayerIndex = (currentPlayerIndex - 1 + players.size()) % players.size();
-        } else {
-            nextPlayerIndex = (currentPlayerIndex + 1) % players.size();
-        }
-
-        System.out.println("Next player would be index: " + nextPlayerIndex);
-        return players.get(nextPlayerIndex);
-    }
-} 
+}

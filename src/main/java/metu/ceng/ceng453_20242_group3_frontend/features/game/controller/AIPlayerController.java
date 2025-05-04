@@ -18,48 +18,50 @@ import metu.ceng.ceng453_20242_group3_frontend.features.game.view.NotificationMa
  * Controller for AI player actions.
  */
 public class AIPlayerController {
-    
+
     private final List<ComputerAIPlayer> aiPlayers = new ArrayList<>();
     private final Game game;
     private final NotificationManager notificationManager;
     private final GameTableController gameTableController;
-    
+
     /**
      * Interface for handling card playing callbacks
      */
     public interface CardPlayCallback {
         void onCardPlayed(int aiIndex, Card card);
+
         void onCardDrawn();
+
         void onGameEnd(boolean isAIWinner);
     }
-    
+
     private final CardPlayCallback cardPlayCallback;
-    
+
     /**
      * Creates a new AI player controller.
      * 
-     * @param game The game model
+     * @param game                The game model
      * @param notificationManager The notification manager
      * @param gameTableController The game table controller
-     * @param cardPlayCallback Callback for card play events
+     * @param cardPlayCallback    Callback for card play events
      */
-    public AIPlayerController(Game game, NotificationManager notificationManager, 
-                              GameTableController gameTableController, CardPlayCallback cardPlayCallback) {
+    public AIPlayerController(Game game, NotificationManager notificationManager,
+            GameTableController gameTableController, CardPlayCallback cardPlayCallback) {
         this.game = game;
         this.notificationManager = notificationManager;
         this.gameTableController = gameTableController;
         this.cardPlayCallback = cardPlayCallback;
-        
+
         // Initialize AI players based on the game model
         initializeAIPlayers();
     }
-    
+
     /**
      * Initialize AI players based on game state.
      */
     private void initializeAIPlayers() {
         aiPlayers.clear();
-        
+
         // Skip the first player (human player)
         List<Player> players = game.getPlayers();
         for (int i = 1; i < players.size(); i++) {
@@ -69,7 +71,7 @@ public class AIPlayerController {
             }
         }
     }
-    
+
     /**
      * Returns the list of AI players.
      * 
@@ -78,21 +80,23 @@ public class AIPlayerController {
     public List<ComputerAIPlayer> getAIPlayers() {
         return aiPlayers;
     }
-    
+
     /**
      * Handles AI turns when it's an AI player's turn
      */
     public void handleAITurns() {
-        if (game == null) {
+        if (game == null || !game.isGameStarted() || game.isGameEnded()) {
             return;
         }
         
         // Debug information
         System.out.println("Checking for AI turns, current player index: " + game.getCurrentPlayerIndex());
         
-        // If it's AI's turn, trigger AI move with a small delay
+        // If it's AI's turn, trigger AI move with a delay
         int currentPlayerIndex = game.getCurrentPlayerIndex();
-        if (currentPlayerIndex > 0) { // Player at index 0 is always human
+        Player currentPlayer = game.getCurrentPlayer();
+        
+        if (currentPlayerIndex > 0 && currentPlayer != null && currentPlayer.isAI()) {
             // Create a delay so AI doesn't play immediately
             PauseTransition pause = new PauseTransition(Duration.millis(5000));
             pause.setOnFinished(e -> {
@@ -106,150 +110,90 @@ public class AIPlayerController {
             pause.play();
         }
     }
-    
+
     /**
-     * Simulates a simple AI turn.
-     *
-     * @param aiIndex The index of the AI player in the game's player list
+     * Implements a simple AI turn with basic decision-making
+     * 
+     * @param aiIndex The index of the AI player taking the turn
      */
     private void simpleAITurn(int aiIndex) {
-        Player aiPlayer = game.getPlayers().get(aiIndex);
-        
-        // Make sure it's this AI's turn
-        if (!game.getCurrentPlayer().equals(aiPlayer)) {
-            System.out.println("Not AI player's turn anymore, skipping AI move");
+        Player aiPlayer = game.getPlayerByIndex(aiIndex);
+        if (aiPlayer == null) {
+            System.out.println("Invalid AI player index: " + aiIndex);
             return;
         }
         
-        System.out.println("AI player " + aiPlayer.getName() + " is checking for playable cards");
+        ComputerAIPlayer aiInstance = aiPlayers.get(aiIndex - 1);
         
-        // Update which cards are playable
-        game.updatePlayableCards();
-        
-        // Log all playable cards for debugging
-        System.out.println("Checking AI hand for playable cards:");
-        for (Card c : aiPlayer.getHand()) {
-            System.out.println("  Card: " + c + ", Playable: " + c.isPlayable());
+        // Check if it's still AI's turn
+        if (game.getCurrentPlayerIndex() != aiIndex) {
+            System.out.println("Not AI's turn anymore, skipping turn for AI " + aiIndex);
+            return;
         }
         
-        // Get the corresponding AI instance
-        ComputerAIPlayer aiInstance = aiPlayers.get(aiIndex - 1);
+        // Make sure playable cards are up-to-date
+        game.updatePlayableCards();
         
         // Check if AI should draw or play
         if (aiInstance.shouldDraw(aiPlayer.getHand())) {
             System.out.println("AI has no playable cards, will draw a card");
             
-            // Delay before drawing
             PauseTransition pause = new PauseTransition(Duration.millis(2000));
             pause.setOnFinished(e -> {
-                // Draw a card
-                Card drawnCard = game.drawCardForCurrentPlayer();
+                // Draw a card without advancing turn
+                Card drawnCard = game.drawCardWithoutAdvancingTurn();
                 System.out.println("AI drew: " + (drawnCard != null ? drawnCard.toString() : "null"));
                 
-                // Notify card drawn
-                cardPlayCallback.onCardDrawn();
-                
-                // If it's now the human player's turn, update playable cards
-                if (!game.getCurrentPlayer().isAI()) {
-                    // Update game table animations for human player's turn
-                    gameTableController.updatePlayerAreaAnimations(game);
-                } else {
-                    // Otherwise, handle the next AI turn
-                    handleAITurns();
-                }
+                // Handle the drawn card
+                handleAIDrawnCard(aiIndex, drawnCard);
             });
             pause.play();
             return;
         }
         
-        // Find a playable card using AI's decision-making
-        Card cardToPlay = aiInstance.selectCardToPlay(aiPlayer.getHand(), game.getCurrentColor());
-        
+        // Find a playable card
+        CardColor currentColor = game.getCurrentColor();
+        Card cardToPlay = selectCardToPlay(aiPlayer.getHand(), currentColor);
+
         if (cardToPlay != null) {
-            // Double check this card is actually playable according to game rules
-            if (!cardToPlay.isPlayable()) {
-                System.out.println("WARNING: AI tried to play a card marked as unplayable: " + cardToPlay);
-                
-                // Draw a card instead
-                PauseTransition pause = new PauseTransition(Duration.millis(2000));
-                pause.setOnFinished(e -> {
-                    Card drawnCard = game.drawCardForCurrentPlayer();
-                    System.out.println("AI drew instead: " + (drawnCard != null ? drawnCard.toString() : "null"));
-                    
-                    // Notify card drawn
-                    cardPlayCallback.onCardDrawn();
-                    
-                    // Continue game flow
-                    if (game.getCurrentPlayer().isAI()) {
-                        handleAITurns();
-                    } else {
-                        gameTableController.updatePlayerAreaAnimations(game);
-                    }
-                });
-                pause.play();
-                return;
-            }
-            
-            final Card finalCardToPlay = cardToPlay; // Need final var for lambda
-            
-            // Handle wild card color selection - IMPORTANT: For Wild Draw Four, we don't select
-            // the color until we're sure it can be played
-            if (cardToPlay.isWildCard() && cardToPlay.getAction() != CardAction.WILD_DRAW_FOUR) {
-                // Select a color based on AI's cards
-                CardColor selectedColor = aiInstance.makeWildCardDecision(aiPlayer.getHand());
-                System.out.println("AI selected color for wild card: " + selectedColor);
-                
-                // Set the color in the game
-                game.setCurrentColor(selectedColor);
-                
-                // Small delay before playing the card
-                PauseTransition pause = new PauseTransition(Duration.millis(2000));
-                pause.setOnFinished(e -> {
-                    playAICard(aiIndex, finalCardToPlay);
-                });
-                pause.play();
-            } else {
-                // Play card directly after a short delay
-                PauseTransition pause = new PauseTransition(Duration.millis(2000));
-                pause.setOnFinished(e -> {
-                    playAICard(aiIndex, finalCardToPlay);
-                });
-                pause.play();
-            }
+            System.out.println("AI found a playable card: " + cardToPlay);
+            // Play the card
+            final Card selectedCard = cardToPlay;
+            PauseTransition pause = new PauseTransition(Duration.millis(2000));
+            pause.setOnFinished(e -> playAICard(aiIndex, selectedCard));
+            pause.play();
         } else {
             // No playable card found, draw instead
             System.out.println("AI found no playable cards, drawing a card...");
             
+            // Draw a card without advancing turn
             PauseTransition pause = new PauseTransition(Duration.millis(2000));
             pause.setOnFinished(e -> {
-                Card drawnCard = game.drawCardForCurrentPlayer();
+                Card drawnCard = game.drawCardWithoutAdvancingTurn();
                 System.out.println("AI drew: " + (drawnCard != null ? drawnCard.toString() : "null"));
                 
-                // Notify card drawn
-                cardPlayCallback.onCardDrawn();
-                
-                // Continue game flow
-                if (game.getCurrentPlayer().isAI()) {
-                    handleAITurns();
-                } else {
-                    gameTableController.updatePlayerAreaAnimations(game);
-                }
+                // Handle the drawn card
+                handleAIDrawnCard(aiIndex, drawnCard);
             });
             pause.play();
         }
     }
-    
+
     /**
      * Plays a card for an AI player.
      * 
      * @param aiIndex The index of the AI player
-     * @param card The card to play
+     * @param card    The card to play
      */
     private void playAICard(int aiIndex, Card card) {
-        Player aiPlayer = game.getPlayers().get(aiIndex);
+        Player aiPlayer = game.getPlayerByIndex(aiIndex);
+        if (aiPlayer == null) {
+            System.out.println("Invalid AI player index: " + aiIndex);
+            return;
+        }
         
         // Make sure it's still this AI's turn
-        if (!game.getCurrentPlayer().equals(aiPlayer)) {
+        if (game.getCurrentPlayerIndex() != aiIndex) {
             System.out.println("Not AI player's turn anymore, skipping card play");
             return;
         }
@@ -259,55 +203,24 @@ public class AIPlayerController {
             System.out.println("ERROR: Attempting to play an unplayable card: " + card + ". Drawing instead.");
             
             // Draw a card instead
-            Card drawnCard = game.drawCardForCurrentPlayer();
-            
-            // Notify card drawn
-            cardPlayCallback.onCardDrawn();
-            
-            // Continue game flow
-            if (game.getCurrentPlayer().isAI()) {
-                handleAITurns();
-            } else {
-                gameTableController.updatePlayerAreaAnimations(game);
-            }
+            PauseTransition pause = new PauseTransition(Duration.millis(2000));
+            pause.setOnFinished(e -> {
+                Card drawnCard = game.drawCardWithoutAdvancingTurn();
+                System.out.println("AI drew: " + (drawnCard != null ? drawnCard.toString() : "null"));
+                
+                // Handle the drawn card
+                handleAIDrawnCard(aiIndex, drawnCard);
+            });
+            pause.play();
             return;
         }
         
-        // For WILD_DRAW_FOUR, we need to check if it can be legally played before setting a color
-        if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
-            // Check if the player has any cards matching the current color
-            boolean hasMatchingColor = false;
-            for (Card playerCard : aiPlayer.getHand()) {
-                if (playerCard != card && playerCard.getColor() == game.getCurrentColor() && 
-                    playerCard.getColor() != CardColor.MULTI) {
-                    hasMatchingColor = true;
-                    break;
-                }
-            }
-            
-            if (hasMatchingColor) {
-                System.out.println("AI tried to play WILD_DRAW_FOUR but has matching color cards. Drawing instead.");
-                
-                // Draw a card instead
-                Card drawnCard = game.drawCardForCurrentPlayer();
-                
-                // Notify card drawn
-                cardPlayCallback.onCardDrawn();
-                
-                // Continue game flow
-                if (game.getCurrentPlayer().isAI()) {
-                    handleAITurns();
-                } else {
-                    gameTableController.updatePlayerAreaAnimations(game);
-                }
-                return;
-            }
-            
-            // If we get here, we can play the WILD_DRAW_FOUR safely
-            // Now select a color AFTER we've verified it's legal to play
+        // For WILD cards, select a color before playing
+        if (card.isWildCard()) {
+            // Select a color based on AI's cards
             ComputerAIPlayer aiInstance = aiPlayers.get(aiIndex - 1);
             CardColor selectedColor = aiInstance.makeWildCardDecision(aiPlayer.getHand());
-            System.out.println("AI selected color for WILD_DRAW_FOUR: " + selectedColor);
+            System.out.println("AI selected color for " + card.getAction() + ": " + selectedColor);
             
             // Set the color in the game
             game.setCurrentColor(selectedColor);
@@ -325,7 +238,7 @@ public class AIPlayerController {
         
         if (success) {
             // Show wild card color notification separately to ensure it's always displayed
-            if (card.isWildCard() && game.getCurrentColor() != CardColor.MULTI) {
+            if (card.isWildCard()) {
                 notificationManager.showColorSelectionNotification(aiPlayer.getName(), game.getCurrentColor());
             }
             
@@ -364,21 +277,114 @@ public class AIPlayerController {
             // If play failed, try drawing instead
             PauseTransition pause = new PauseTransition(Duration.millis(2000));
             pause.setOnFinished(e -> {
-                Card drawnCard = game.drawCardForCurrentPlayer();
-                System.out.println("AI is drawing a card instead: " + drawnCard);
+                Card drawnCard = game.drawCardWithoutAdvancingTurn();
+                System.out.println("AI drew: " + (drawnCard != null ? drawnCard.toString() : "null"));
                 
-                // Notify card drawn
-                cardPlayCallback.onCardDrawn();
-                
-                // Continue game flow
-                if (game.getCurrentPlayer().isAI()) {
-                    handleAITurns();
-                } else {
-                    // Update game table animations for human player's turn
-                    gameTableController.updatePlayerAreaAnimations(game);
-                }
+                // Handle the drawn card
+                handleAIDrawnCard(aiIndex, drawnCard);
             });
             pause.play();
         }
     }
-} 
+
+    /**
+     * Handles a card drawn by an AI player, checking if it's playable and playing
+     * it if possible.
+     * 
+     * @param aiIndex   The index of the AI player
+     * @param drawnCard The card that was drawn
+     */
+    private void handleAIDrawnCard(int aiIndex, Card drawnCard) {
+        Player aiPlayer = game.getPlayerByIndex(aiIndex);
+        if (aiPlayer == null) {
+            System.out.println("Invalid AI player index: " + aiIndex);
+            return;
+        }
+        
+        // Check if the drawn card is playable
+        if (drawnCard != null && drawnCard.isPlayable()) {
+            System.out.println("AI drew a playable card: " + drawnCard + ". Playing it now.");
+            
+            // Show notification about drawing a playable card
+            notificationManager.showActionNotification(aiPlayer.getName(), "drew a card and will play it");
+            
+            // Small delay before playing the drawn card
+            PauseTransition pause = new PauseTransition(Duration.millis(2000));
+            pause.setOnFinished(e -> {
+                playAICard(aiIndex, drawnCard);
+            });
+            pause.play();
+        } else {
+            System.out.println("AI drew a card that is not playable. Passing turn.");
+            
+            // Show notification about drawing a non-playable card
+            notificationManager.showActionNotification(aiPlayer.getName(), "drew a card and passed");
+            
+            // Advance to the next player's turn
+            game.advanceTurnAfterDraw();
+            
+            // Notify card drawn
+            cardPlayCallback.onCardDrawn();
+            
+            // Continue game flow
+            if (game.getCurrentPlayer().isAI()) {
+                handleAITurns();
+            } else {
+                gameTableController.updatePlayerAreaAnimations(game);
+            }
+        }
+    }
+
+    /**
+     * Finds the best card for the AI to play from its hand.
+     * Uses a strategy to play the most effective card.
+     * 
+     * @param playerHand   The AI player's hand
+     * @param currentColor The current game color
+     * @return The card to play, or null if no playable card
+     */
+    public Card selectCardToPlay(List<Card> playerHand, CardColor currentColor) {
+        // First try to play a non-wild card that matches the current color
+        for (Card card : playerHand) {
+            if (card.isPlayable() && !card.isWildCard() && card.getColor() == currentColor) {
+                System.out.println("AI selecting matching color card: " + card);
+                return card;
+            }
+        }
+        
+        // Then try to play a number card that matches the top card's number
+        for (Card card : playerHand) {
+            if (card.isPlayable() && card.isNumberCard()) {
+                System.out.println("AI selecting matching number card: " + card);
+                return card;
+            }
+        }
+        
+        // Then try action cards
+        for (Card card : playerHand) {
+            if (card.isPlayable() && card.isActionCard() && !card.isWildCard()) {
+                System.out.println("AI selecting action card: " + card);
+                return card;
+            }
+        }
+        
+        // Try regular wild cards
+        for (Card card : playerHand) {
+            if (card.isPlayable() && card.getAction() == CardAction.WILD) {
+                System.out.println("AI selecting WILD card: " + card);
+                return card;
+            }
+        }
+        
+        // Finally try WILD_DRAW_FOUR if it's playable
+        for (Card card : playerHand) {
+            if (card.isPlayable() && card.getAction() == CardAction.WILD_DRAW_FOUR) {
+                System.out.println("AI selecting WILD_DRAW_FOUR: " + card);
+                return card;
+            }
+        }
+        
+        System.out.println("AI couldn't find any playable cards");
+        return null;
+    }
+}

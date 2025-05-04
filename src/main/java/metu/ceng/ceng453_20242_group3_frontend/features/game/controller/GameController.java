@@ -169,12 +169,6 @@ public class GameController {
             playerCount
         );
         
-        // FORCE the direction to be COUNTER_CLOCKWISE
-        if (game.getDirection() != Direction.COUNTER_CLOCKWISE) {
-            System.out.println("!!! WARNING: Game direction was not counter-clockwise, forcing it now !!!");
-            game.setDirection(Direction.COUNTER_CLOCKWISE);
-        }
-        
         // Debug output to confirm game direction
         System.out.println("GAME INITIALIZATION - DIRECTION IS: " + game.getDirection());
         
@@ -428,23 +422,8 @@ public class GameController {
         for (Card card : humanPlayer.getHand()) {
             StackPane cardView = createCardView(card);
             
-            // Make sure WILD_DRAW_FOUR cards are checked again
+            // Check if the card is playable according to the game rules
             boolean isPlayable = card.isPlayable();
-            
-            // Extra validation for WILD_DRAW_FOUR to prevent UI bugs
-            if (isPlayable && card.getAction() == CardAction.WILD_DRAW_FOUR) {
-                // Double check if player has matching color cards
-                for (Card playerCard : humanPlayer.getHand()) {
-                    if (playerCard != card && 
-                        playerCard.getColor() == game.getCurrentColor() && 
-                        playerCard.getColor() != CardColor.MULTI) {
-                        
-                        isPlayable = false;
-                        System.out.println("Disabling WILD_DRAW_FOUR in UI - player has matching color card: " + playerCard);
-                        break;
-                    }
-                }
-            }
             
             // Only enable click for playable cards and when it's player's turn
             if (isPlayable && game.getCurrentPlayerIndex() == 0) {
@@ -523,23 +502,12 @@ public class GameController {
             
             // For wild cards, handle color selection
             if (card.isWildCard()) {
-                // For WILD_DRAW_FOUR, check if it's valid (should be in initial state)
-                if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
-                    // In the initial state, WILD_DRAW_FOUR should be playable
-                    handleWildCardColorSelection(card, () -> {
-                        finishCardPlay(cardView, card);
-                    });
-                } else {
-                    // Regular wild card
-                    handleWildCardColorSelection(card, () -> {
-                        finishCardPlay(cardView, card);
-                    });
-                }
+                // For wild cards, use the color selection dialog
+                handleWildCardColorSelection(card, () -> {
+                    finishCardPlay(cardView, card);
+                });
             } else {
-                // For regular cards, set the game color to the card's color
-                if (card.getColor() != CardColor.MULTI) {
-                    game.setCurrentColor(card.getColor());
-                }
+                // For regular cards, the game will set the color to the card's color
                 finishCardPlay(cardView, card);
             }
             return;
@@ -556,33 +524,17 @@ public class GameController {
         
         // Extra validation for WILD_DRAW_FOUR
         if (card.getAction() == CardAction.WILD_DRAW_FOUR) {
-            // Check if player has cards matching the current color
-            boolean hasMatchingColorCard = false;
-            for (Card playerCard : currentPlayer.getHand()) {
-                if (playerCard != card && 
-                    playerCard.getColor() == game.getCurrentColor() && 
-                    playerCard.getColor() != CardColor.MULTI) {
-                    
-                    hasMatchingColorCard = true;
-                    break;
-                }
-            }
-            
-            if (hasMatchingColorCard) {
-                showCardUnplayableMessage("You can't play a Wild Draw Four when you have cards matching the current color.");
-                return;
-            }
-        }
-        
-        // Set the first card played flag (for initial card)
-        firstCardPlayed = true;
-        
-        // Check for wild cards that need color selection
-        if (card.isWildCard()) {
+            // Let the Game class handle the validation, we just need to select color
+            handleWildCardColorSelection(card, () -> {
+                finishCardPlay(cardView, card);
+            });
+        } else if (card.isWildCard()) {
+            // For other wild cards, handle color selection
             handleWildCardColorSelection(card, () -> {
                 finishCardPlay(cardView, card);
             });
         } else {
+            // For regular cards, game will set the color to the card's color
             finishCardPlay(cardView, card);
         }
     }
@@ -804,7 +756,7 @@ public class GameController {
             StackPane cardView;
             
             // For wild cards, use the special card renderer with color indicator
-            if (topCard.isWildCard() && game.getCurrentColor() != null && game.getCurrentColor() != CardColor.MULTI) {
+            if (topCard.isWildCard()) {
                 cardView = CardRenderer.createWildCardWithSelectedColor(topCard, game.getCurrentColor());
                 
                 // Add a slight rotation for visual interest
@@ -848,8 +800,8 @@ public class GameController {
             return;
         }
         
-        // Draw a card for the current player
-        Card drawnCard = game.drawCardForCurrentPlayer();
+        // Draw a card without advancing the turn
+        Card drawnCard = game.drawCardWithoutAdvancingTurn();
         
         if (drawnCard != null) {
             // Create animation for card being added to hand
@@ -874,17 +826,42 @@ public class GameController {
             
             javafx.animation.ParallelTransition animation = new javafx.animation.ParallelTransition(fadeIn, moveIn);
             animation.setOnFinished(e -> {
-                // Update the full UI after animation completes
+                // Update the UI after animation completes
                 updateUI();
                 
                 // Update direction indicator
                 updateDirectionIndicator();
                 
-                // Update turn label
-                updateTurnLabel();
+                // Check if the drawn card is playable
+                boolean isPlayable = drawnCard.isPlayable();
                 
-                // Check if an automatic move is needed for AI
-                aiPlayerController.handleAITurns();
+                if (isPlayable) {
+                    // If the card is playable, show a notification and don't advance the turn
+                    notificationManager.showActionNotification("System", "The drawn card is playable. You may play it now.");
+                    
+                    // Highlight the drawn card more prominently
+                    cardView.setEffect(new javafx.scene.effect.DropShadow(20, Color.GOLD));
+                    ScaleTransition pulse = new ScaleTransition(Duration.millis(500), cardView);
+                    pulse.setFromX(1.0);
+                    pulse.setFromY(1.0);
+                    pulse.setToX(1.2);
+                    pulse.setToY(1.2);
+                    pulse.setCycleCount(3);
+                    pulse.setAutoReverse(true);
+                    pulse.play();
+                } else {
+                    // If the card is not playable, advance to the next player's turn
+                    game.advanceTurnAfterDraw();
+                    
+                    // Show a notification that the card is not playable
+                    notificationManager.showActionNotification("System", "The drawn card cannot be played. Turn passed.");
+                    
+                    // Update turn label
+                    updateTurnLabel();
+                    
+                    // Check if an automatic move is needed for AI
+                    aiPlayerController.handleAITurns();
+                }
             });
             
             animation.play();
@@ -892,6 +869,10 @@ public class GameController {
             // If no card was drawn (e.g., draw pile is empty), still update the UI
             updateUI();
             updateDirectionIndicator();
+            
+            // Since no card was drawn, advance to the next player's turn
+            game.advanceTurnAfterDraw();
+            
             updateTurnLabel();
             aiPlayerController.handleAITurns();
         }

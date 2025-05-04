@@ -157,25 +157,25 @@ public class Player {
     }
 
     /**
-     * Checks if the player has a valid card to play.
+     * Checks if the player has any playable cards.
+     * This is a convenience method that checks if any card in the hand is marked as playable.
      *
-     * @param topCard The card on top of the discard pile
-     * @return true if the player has a valid card, false otherwise
+     * @return true if the player has at least one playable card, false otherwise
      */
-    public boolean hasValidMove(Card topCard) {
-        return hand.stream().anyMatch(card -> card.canPlayOn(topCard));
+    public boolean hasPlayableCards() {
+        return hand.stream().anyMatch(Card::isPlayable);
     }
 
     /**
-     * Gets a list of cards that can be played on the given card.
+     * Gets a list of cards that are currently marked as playable.
+     * Note: Cards must be marked as playable by calling Game.updatePlayableCards() first.
      *
-     * @param topCard The card on top of the discard pile
      * @return A list of playable cards
      */
-    public List<Card> getPlayableCards(Card topCard) {
+    public List<Card> getPlayableCards() {
         List<Card> playableCards = new ArrayList<>();
         for (Card card : hand) {
-            if (card.canPlayOn(topCard)) {
+            if (card.isPlayable()) {
                 playableCards.add(card);
             }
         }

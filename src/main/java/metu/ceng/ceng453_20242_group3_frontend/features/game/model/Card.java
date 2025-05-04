@@ -29,7 +29,7 @@ public class Card {
     /**
      * Constructor for creating an action card (Skip, Reverse, Draw Two).
      *
-     * @param color The color of the card
+     * @param color  The color of the card
      * @param action The action of the card
      */
     public Card(CardColor color, CardAction action) {
@@ -47,7 +47,7 @@ public class Card {
     public CardType getType() {
         return type;
     }
-    
+
     public CardAction getAction() {
         return action;
     }
@@ -55,15 +55,15 @@ public class Card {
     public int getValue() {
         return value;
     }
-    
+
     public boolean isNumberCard() {
         return action == CardAction.NONE && value >= 0;
     }
-    
+
     public boolean isActionCard() {
         return action != CardAction.NONE;
     }
-    
+
     public boolean isWildCard() {
         return type == CardType.WILDCARD;
     }
@@ -76,36 +76,12 @@ public class Card {
         this.playable = playable;
     }
 
-    /**
-     * Checks if this card can be played on top of the given card.
-     *
-     * @param topCard The card on top of the discard pile
-     * @return true if this card can be played, false otherwise
-     */
-    public boolean canPlayOn(Card topCard) {
-        // Wild cards can be played on any card
-        if (this.type == CardType.WILDCARD) {
-            return true;
-        }
-
-        // Cards with the same color can be played
-        if (this.color == topCard.color) {
-            return true;
-        }
-
-        // Cards with the same action can be played
-        if (this.action != CardAction.NONE && this.action == topCard.action) {
-            return true;
-        }
-
-        // Number cards with the same value can be played
-        return this.isNumberCard() && topCard.isNumberCard() && this.value == topCard.value;
-    }
-
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         Card card = (Card) o;
         return value == card.value && color == card.color && type == card.type && action == card.action;
     }
@@ -123,4 +99,4 @@ public class Card {
             return color + " " + action;
         }
     }
-} 
+}

@@ -60,70 +60,6 @@ public class ComputerAIPlayer {
     }
     
     /**
-     * Finds the best card for the AI to play from its hand.
-     * Current implementation simply returns the first playable card.
-     * 
-     * @param playerHand The AI player's hand
-     * @param currentColor The current game color
-     * @return The card to play, or null if no playable card
-     */
-    public Card selectCardToPlay(List<Card> playerHand, CardColor currentColor) {
-        // For WILD_DRAW_FOUR, we need to verify the player DOESN'T have matching color cards
-        // This is an extra precaution on top of the game's isPlayable logic
-        
-        // First look for non-wild cards matching current color
-        boolean hasMatchingColorCard = false;
-        for (Card card : playerHand) {
-            if (card.getColor() == currentColor && card.getColor() != CardColor.MULTI) {
-                hasMatchingColorCard = true;
-                break;
-            }
-        }
-        
-        // First try to play a non-wild card that matches the current color
-        for (Card card : playerHand) {
-            if (card.isPlayable() && !card.isWildCard() && card.getColor() == currentColor) {
-                return card;
-            }
-        }
-        
-        // Then try to play a number card that matches the top card's number
-        for (Card card : playerHand) {
-            if (card.isPlayable() && card.isNumberCard()) {
-                return card;
-            }
-        }
-        
-        // Then try action cards
-        for (Card card : playerHand) {
-            if (card.isPlayable() && card.isActionCard() && !card.isWildCard()) {
-                return card;
-            }
-        }
-        
-        // Try regular wild cards
-        for (Card card : playerHand) {
-            if (card.isPlayable() && card.getAction() == CardAction.WILD) {
-                return card;
-            }
-        }
-        
-        // Only try WILD_DRAW_FOUR if we don't have matching color cards
-        if (!hasMatchingColorCard) {
-            for (Card card : playerHand) {
-                if (card.isPlayable() && card.getAction() == CardAction.WILD_DRAW_FOUR) {
-                    return card;
-                }
-            }
-        } else {
-            System.out.println("AI has matching color cards, skipping WILD_DRAW_FOUR");
-        }
-        
-        // No playable card
-        return null;
-    }
-    
-    /**
      * Makes a strategic decision on which color to choose for a wild card.
      * Currently just selects a random color, but could be enhanced with
      * more strategic considerations.
@@ -175,24 +111,24 @@ public class ComputerAIPlayer {
      */
     public boolean shouldDraw(List<Card> playerHand) {
         boolean hasPlayableCards = false;
-        boolean hasUnplayableWildDrawFour = false;
+        int playableCardCount = 0;
         
+        System.out.println("AI checking hand for playable cards:");
         for (Card card : playerHand) {
             if (card.isPlayable()) {
+                playableCardCount++;
                 hasPlayableCards = true;
-            }
-            
-            // Also check specifically for WILD_DRAW_FOUR that might be incorrectly marked as playable
-            if (card.getAction() == CardAction.WILD_DRAW_FOUR && !card.isPlayable()) {
-                hasUnplayableWildDrawFour = true;
+                System.out.println("  Playable card: " + card);
+            } else {
+                System.out.println("  Unplayable card: " + card);
             }
         }
         
         // Log detailed information about the decision
         if (!hasPlayableCards) {
-            System.out.println("AI has no playable cards, should draw");
-        } else if (hasUnplayableWildDrawFour) {
-            System.out.println("AI has playable cards but also has unplayable WILD_DRAW_FOUR, checking carefully");
+            System.out.println("AI has no playable cards (" + playableCardCount + " of " + playerHand.size() + "), should draw");
+        } else {
+            System.out.println("AI has " + playableCardCount + " playable cards out of " + playerHand.size() + " total, should play");
         }
         
         return !hasPlayableCards;
