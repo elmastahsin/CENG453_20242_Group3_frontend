@@ -236,8 +236,8 @@ public class WebSocketManager {
             
             webSocketClient.send(connectFrame);
             
-            // Wait a moment for connection to be established
-            Thread.sleep(1000);
+            // Wait longer for STOMP connection to be established
+            Thread.sleep(2000);
             
             // Send STOMP SEND frame to join game
             String destination = "/app/game/" + gameId + "/join";
@@ -258,8 +258,93 @@ public class WebSocketManager {
             
             webSocketClient.send(sendFrame);
             
+            // Wait longer for join to be processed by server
+            Thread.sleep(1500);
+            
+            // Send SUBSCRIBE frame to receive game state updates
+            String subscribeDestination = "/topic/game/" + gameId + "/lobby";
+            String subscribeId = "sub-game-" + gameId;
+            String subscribeFrame = "SUBSCRIBE\n" +
+                                   "id:" + subscribeId + "\n" +
+                                   "destination:" + subscribeDestination + "\n" +
+                                   "\n" +
+                                   "\0";
+            
+            System.out.println("=== SENDING STOMP SUBSCRIBE ===");
+            System.out.println("Game ID: " + gameId);
+            System.out.println("Subscribe ID: " + subscribeId);
+            System.out.println("Subscribe Destination: " + subscribeDestination);
+            System.out.println("STOMP Frame:");
+            System.out.println(subscribeFrame);
+            System.out.println("===============================");
+            
+            webSocketClient.send(subscribeFrame);
+            
+            System.out.println("✅ ALL STOMP FRAMES SENT SUCCESSFULLY");
+            System.out.println("- CONNECT frame sent");
+            System.out.println("- SEND (join game) frame sent");
+            System.out.println("- SUBSCRIBE (game state) frame sent");
+            System.out.println("Now waiting for game state updates...");
+            
+            // Start a timeout timer to check for game state updates
+            new Thread(() -> {
+                try {
+                    Thread.sleep(10000); // Wait 10 seconds
+                    if (isConnected) {
+                        System.out.println("⚠️ === GAME STATE TIMEOUT WARNING ===");
+                        System.out.println("No game state received after 10 seconds");
+                        System.out.println("This might indicate:");
+                        System.out.println("1. Game hasn't started yet (waiting for more players)");
+                        System.out.println("2. Server subscription issue");
+                        System.out.println("3. Game state is empty/pending");
+                        System.out.println("Connection is still active - will continue listening...");
+                        System.out.println("=====================================");
+                        
+                        // Try to manually request game state
+                        requestGameState(gameId);
+                    }
+                } catch (InterruptedException e) {
+                    // Thread interrupted, ignore
+                }
+            }).start();
+            
         } catch (Exception e) {
             System.err.println("✗ Failed to send STOMP join game message: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Manually requests the current game state.
+     * 
+     * @param gameId The game ID to request state for
+     */
+    private void requestGameState(int gameId) {
+        if (!isConnected) {
+            System.err.println("Cannot request game state - not connected");
+            return;
+        }
+        
+        try {
+            System.out.println("🔄 === MANUALLY REQUESTING GAME STATE ===");
+            
+            String destination = "/app/game/" + gameId + "/state";
+            String sendFrame = "SEND\n" +
+                              "destination:" + destination + "\n" +
+                              "content-type:application/json\n" +
+                              "\n" +
+                              "{}\n" +
+                              "\0";
+            
+            System.out.println("Destination: " + destination);
+            System.out.println("STOMP Frame:");
+            System.out.println(sendFrame);
+            System.out.println("========================================");
+            
+            webSocketClient.send(sendFrame);
+            
+        } catch (Exception e) {
+            System.err.println("✗ Failed to request game state: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -277,16 +362,37 @@ public class WebSocketManager {
             
             // Parse STOMP frame
             if (message.startsWith("CONNECTED")) {
-                System.out.println("✓ STOMP Connected successfully");
-                if (callback != null) {
-                    Platform.runLater(() -> callback.onConnected());
+                System.out.println("✅ STOMP Connected successfully");
+                System.out.println("Server acknowledged CONNECT frame");
+                
+                // Extract connection details
+                String[] lines = message.split("\n");
+                for (String line : lines) {
+                    if (line.startsWith("version:")) {
+                        System.out.println("📋 STOMP Version: " + line.substring(8));
+                    } else if (line.startsWith("heart-beat:")) {
+                        System.out.println("💓 Heart-beat: " + line.substring(11));
+                    } else if (line.startsWith("user-name:")) {
+                        System.out.println("👤 Authenticated as: " + line.substring(10));
+                    }
                 }
+                
+                // Don't call callback here - wait for actual game state
                 return;
             }
             
             if (message.startsWith("ERROR")) {
                 System.err.println("❌ STOMP ERROR received:");
                 System.err.println(message);
+                
+                // Parse error details
+                String[] lines = message.split("\n");
+                for (String line : lines) {
+                    if (line.startsWith("message:")) {
+                        System.err.println("Error message: " + line.substring(8));
+                    }
+                }
+                
                 if (callback != null) {
                     Platform.runLater(() -> callback.onError("STOMP Error: " + message));
                 }
@@ -294,117 +400,194 @@ public class WebSocketManager {
             }
             
             if (message.startsWith("MESSAGE")) {
-                System.out.println("📊 STOMP MESSAGE received:");
+                System.out.println("📨 STOMP MESSAGE received:");
+                System.out.println("🎉 === GAME STATE UPDATE INCOMING ===");
                 
-                // Extract JSON payload from STOMP MESSAGE frame
+                // Parse STOMP MESSAGE frame headers and body
                 String[] lines = message.split("\n");
+                String destination = null;
+                String subscriptionId = null;
                 boolean inBody = false;
                 StringBuilder jsonPayload = new StringBuilder();
                 
                 for (String line : lines) {
                     if (inBody) {
-                        jsonPayload.append(line).append("\n");
+                        if (!line.equals("\0")) {
+                            jsonPayload.append(line).append("\n");
+                        }
+                    } else if (line.startsWith("destination:")) {
+                        destination = line.substring(12);
+                        System.out.println("📍 Message destination: " + destination);
+                    } else if (line.startsWith("subscription:")) {
+                        subscriptionId = line.substring(13);
+                        System.out.println("🆔 Subscription ID: " + subscriptionId);
+                    } else if (line.startsWith("content-type:")) {
+                        System.out.println("📄 Content-Type: " + line.substring(13));
                     } else if (line.trim().isEmpty()) {
                         inBody = true; // Empty line indicates start of body
+                        System.out.println("📄 Starting to parse message body...");
                     }
                 }
                 
                 String jsonContent = jsonPayload.toString().trim();
+                System.out.println("📋 JSON Content Length: " + jsonContent.length());
+                
                 if (!jsonContent.isEmpty() && !jsonContent.equals("\0")) {
+                    System.out.println("🔍 Raw JSON Content:");
+                    System.out.println(jsonContent);
+                    System.out.println("========================");
+                    
                     try {
-                        // Try to parse as JSON
-                        JsonNode root = objectMapper.readTree(jsonContent);
-                        handleGameStateUpdate(root);
+                        // Parse JSON game state
+                        JsonNode gameState = objectMapper.readTree(jsonContent);
+                        handleGameStateReceived(gameState, destination, subscriptionId);
                     } catch (Exception je) {
-                        System.out.println("Non-JSON message content: " + jsonContent);
+                        System.err.println("❌ Failed to parse JSON content: " + je.getMessage());
+                        System.err.println("Raw content that failed: " + jsonContent);
+                        je.printStackTrace();
+                    }
+                } else {
+                    System.out.println("⚠️ Empty or null message body received");
+                    System.out.println("This might be a heartbeat or acknowledgment message");
+                }
+                return;
+            }
+            
+            if (message.startsWith("RECEIPT")) {
+                System.out.println("✅ STOMP RECEIPT received - operation confirmed");
+                
+                // Parse receipt details
+                String[] lines = message.split("\n");
+                for (String line : lines) {
+                    if (line.startsWith("receipt-id:")) {
+                        System.out.println("📧 Receipt ID: " + line.substring(11));
                     }
                 }
                 return;
             }
             
+            // Handle heartbeat or other simple frames
+            if (message.trim().isEmpty() || message.equals("\n") || message.equals("\0")) {
+                System.out.println("💓 Heartbeat or empty frame received");
+                return;
+            }
+            
             // Handle other STOMP frames
-            System.out.println("❓ UNKNOWN STOMP FRAME: " + message);
+            System.out.println("❓ UNKNOWN STOMP FRAME TYPE:");
+            System.out.println("First line: " + (message.contains("\n") ? message.split("\n")[0] : message));
+            System.out.println("Full content: " + message);
             
         } catch (Exception e) {
-            System.err.println("✗ Failed to parse STOMP message: " + e.getMessage());
-            System.err.println("Raw message: " + message);
+            System.err.println("❌ CRITICAL ERROR parsing STOMP message: " + e.getMessage());
+            System.err.println("Raw message that caused error:");
+            System.err.println(message);
             e.printStackTrace();
         }
     }
     
     /**
-     * Handles parsed game state updates from STOMP messages.
+     * Handles received game state updates with comprehensive logging.
      * 
-     * @param root The parsed JSON node
+     * @param gameState The parsed game state JSON
+     * @param destination The STOMP destination
+     * @param subscriptionId The subscription ID
      */
-    private void handleGameStateUpdate(JsonNode root) {
+    private void handleGameStateReceived(JsonNode gameState, String destination, String subscriptionId) {
         try {
-            // Extract message type
-            String messageType = root.has("type") ? root.get("type").asText() : "GAME_STATE";
+            System.out.println("🎮 === GAME STATE UPDATE RECEIVED ===");
+            System.out.println("📍 From destination: " + destination);
+            System.out.println("🆔 Subscription ID: " + subscriptionId);
             
-            System.out.println("=== PROCESSING GAME UPDATE ===");
-            System.out.println("Type: " + messageType);
-            System.out.println("Content: " + root.toString());
-            System.out.println("=============================");
+            // Extract key game information
+            if (gameState.has("gameId")) {
+                int gameId = gameState.get("gameId").asInt();
+                System.out.println("🎯 Game ID: " + gameId);
+            }
             
-            switch (messageType) {
-                case "GAME_STATE":
-                    // Handle game state updates
-                    System.out.println("📊 GAME STATE RECEIVED:");
-                    System.out.println(root.toString());
-                    
-                    if (callback != null) {
-                        Platform.runLater(() -> callback.onGameStateReceived(root.toString()));
-                    }
-                    break;
-                    
-                case "PLAYER_JOINED":
-                    // Handle player joining
-                    if (root.has("playerName")) {
-                        String playerName = root.get("playerName").asText();
-                        System.out.println("👤 PLAYER JOINED: " + playerName);
-                        
-                        if (callback != null) {
-                            Platform.runLater(() -> callback.onPlayerJoined(playerName));
-                        }
-                    }
-                    break;
-                    
-                case "PLAYER_LEFT":
-                    // Handle player leaving
-                    if (root.has("playerName")) {
-                        String playerName = root.get("playerName").asText();
-                        System.out.println("👤 PLAYER LEFT: " + playerName);
-                        
-                        if (callback != null) {
-                            Platform.runLater(() -> callback.onPlayerLeft(playerName));
-                        }
-                    }
-                    break;
-                    
-                case "PLAYER_MOVE":
-                    // Handle player moves
-                    if (root.has("moveData")) {
-                        String moveData = root.get("moveData").toString();
-                        System.out.println("🎯 PLAYER MOVE RECEIVED:");
-                        System.out.println(moveData);
-                        
-                        if (callback != null) {
-                            Platform.runLater(() -> callback.onGameMove(moveData));
-                        }
-                    }
-                    break;
-                    
-                default:
-                    System.out.println("📋 GAME UPDATE: " + messageType);
-                    if (callback != null) {
-                        Platform.runLater(() -> callback.onGameStateReceived(root.toString()));
-                    }
-                    break;
+            if (gameState.has("status")) {
+                String status = gameState.get("status").asText();
+                System.out.println("📊 Game Status: " + status);
+            }
+            
+            if (gameState.has("currentPlayer")) {
+                String currentPlayer = gameState.get("currentPlayer").asText();
+                System.out.println("🎲 Current Player: " + currentPlayer);
+            }
+            
+            if (gameState.has("isClockwise")) {
+                boolean isClockwise = gameState.get("isClockwise").asBoolean();
+                System.out.println("🔄 Direction: " + (isClockwise ? "Clockwise" : "Counter-clockwise"));
+            }
+            
+            // Log top card information
+            if (gameState.has("topCard") && !gameState.get("topCard").isNull()) {
+                JsonNode topCard = gameState.get("topCard");
+                System.out.println("🃏 Top Card: " + 
+                    topCard.get("color").asText() + " " + 
+                    (topCard.has("number") && !topCard.get("number").isNull() ? 
+                        topCard.get("number").asText() : 
+                        topCard.get("action").asText()));
+            }
+            
+            // Log players information
+            if (gameState.has("players") && gameState.get("players").isArray()) {
+                JsonNode players = gameState.get("players");
+                System.out.println("👥 Players (" + players.size() + "):");
+                for (int i = 0; i < players.size(); i++) {
+                    JsonNode player = players.get(i);
+                    String username = player.get("username").asText();
+                    int cardCount = player.get("cardCount").asInt();
+                    boolean isHost = player.has("isHost") ? player.get("isHost").asBoolean() : false;
+                    System.out.println("  " + (i + 1) + ". " + username + 
+                        " (" + cardCount + " cards)" + 
+                        (isHost ? " [HOST]" : ""));
+                }
+            }
+            
+            // Log player hand information
+            if (gameState.has("playerHand") && gameState.get("playerHand").isArray()) {
+                JsonNode playerHand = gameState.get("playerHand");
+                System.out.println("🎴 Your Hand (" + playerHand.size() + " cards):");
+                for (int i = 0; i < Math.min(playerHand.size(), 5); i++) { // Show first 5 cards
+                    JsonNode card = playerHand.get(i);
+                    System.out.println("  " + (i + 1) + ". " + 
+                        card.get("color").asText() + " " +
+                        (card.has("number") && !card.get("number").isNull() ? 
+                            card.get("number").asText() : 
+                            card.get("action").asText()));
+                }
+                if (playerHand.size() > 5) {
+                    System.out.println("  ... and " + (playerHand.size() - 5) + " more cards");
+                }
+            }
+            
+            // Log deck information
+            if (gameState.has("deckCardsRemaining")) {
+                int deckCards = gameState.get("deckCardsRemaining").asInt();
+                System.out.println("🎰 Deck Cards Remaining: " + deckCards);
+            }
+            
+            // Log last action
+            if (gameState.has("lastAction")) {
+                String lastAction = gameState.get("lastAction").asText();
+                System.out.println("📝 Last Action: " + lastAction);
+            }
+            
+            System.out.println("🎮 === END GAME STATE UPDATE ===");
+            
+            // Notify callback with full game state
+            if (callback != null) {
+                Platform.runLater(() -> {
+                    callback.onGameStateReceived(gameState.toString());
+                    System.out.println("✅ Game state forwarded to UI callback");
+                });
+            } else {
+                System.out.println("⚠️ No callback registered for game state updates");
             }
             
         } catch (Exception e) {
-            System.err.println("✗ Failed to handle game state update: " + e.getMessage());
+            System.err.println("❌ ERROR processing game state: " + e.getMessage());
+            System.err.println("Game state that caused error: " + gameState.toString());
             e.printStackTrace();
         }
     }
