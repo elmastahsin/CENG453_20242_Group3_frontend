@@ -1,0 +1,308 @@
+/* 
+ * Lobby styles for UNO Game
+ * Contains styles for the multiplayer lobby interface
+ * Aligned with original app design
+ */
+
+/* Main lobby container - using original app background */
+.lobby-pane {
+    -fx-background-color: linear-gradient(to right bottom, #fe6565, #ff9468);
+}
+
+.lobby-container {
+    -fx-background-color: transparent;
+    -fx-padding: 20;
+}
+
+/* Header styles - align with original card style */
+.lobby-header {
+    -fx-background-color: rgba(255, 255, 255, 0.95);
+    -fx-background-radius: 15;
+    -fx-padding: 20;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10, 0, 0, 5);
+}
+
+.lobby-title {
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 3, 0, 0, 1);
+}
+
+.player-welcome-label {
+    -fx-font-size: 16px;
+    -fx-text-fill: #666666;
+    -fx-font-weight: normal;
+}
+
+/* Controls section */
+.lobby-controls {
+    -fx-background-color: rgba(255, 255, 255, 0.9);
+    -fx-background-radius: 10;
+    -fx-padding: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 5, 0, 0, 2);
+}
+
+.create-game-button {
+    -fx-background-color: #ff6b6b;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 16px;
+    -fx-padding: 12 25;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 5, 0, 0, 2);
+}
+
+.create-game-button:hover {
+    -fx-background-color: #ff5252;
+}
+
+.refresh-button {
+    -fx-background-color: #6c757d;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-padding: 10 20;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 5, 0, 0, 2);
+}
+
+.refresh-button:hover {
+    -fx-background-color: #5a6268;
+}
+
+.games-count-label {
+    -fx-font-size: 14px;
+    -fx-text-fill: #666666;
+    -fx-font-weight: normal;
+}
+
+/* Games section */
+.games-section {
+    -fx-background-color: rgba(255, 255, 255, 0.95);
+    -fx-background-radius: 15;
+    -fx-padding: 20;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10, 0, 0, 5);
+}
+
+.games-section-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+    -fx-padding: 0 0 15 0;
+}
+
+.games-scroll-pane {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.games-scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.games-scroll-pane .scroll-bar {
+    -fx-background-color: rgba(0, 0, 0, 0.1);
+}
+
+.games-container {
+    -fx-background-color: transparent;
+}
+
+/* Game card styles - align with original card design */
+.game-card {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-border-color: #dee2e6;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 5, 0, 0, 2);
+    -fx-max-width: 850;
+    -fx-pref-width: 850;
+}
+
+.game-card:hover {
+    -fx-background-color: #f8f9fa;
+    -fx-border-color: #ff9468;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 8, 0, 0, 3);
+}
+
+.game-id-label {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ff6b6b;
+}
+
+.game-type-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+    -fx-background-color: #ff9468;
+    -fx-background-radius: 5;
+    -fx-padding: 4 8;
+}
+
+.players-label {
+    -fx-font-size: 14px;
+    -fx-text-fill: #333333;
+    -fx-font-weight: bold;
+}
+
+.players-container {
+    -fx-background-color: #f8f9fa;
+    -fx-background-radius: 5;
+    -fx-padding: 10;
+    -fx-border-color: #e9ecef;
+    -fx-border-radius: 5;
+    -fx-border-width: 1;
+}
+
+.player-name-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: #666666;
+    -fx-font-style: normal;
+}
+
+.join-button {
+    -fx-background-color: #ff6b6b;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-padding: 8 20;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 3, 0, 0, 1);
+}
+
+.join-button:hover {
+    -fx-background-color: #ff5252;
+}
+
+.join-button-disabled {
+    -fx-background-color: #6c757d;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-padding: 8 20;
+    -fx-background-radius: 6;
+    -fx-opacity: 0.7;
+}
+
+/* Empty states and messages */
+.no-games-label {
+    -fx-font-size: 16px;
+    -fx-text-fill: #888888;
+    -fx-font-style: italic;
+    -fx-padding: 40;
+}
+
+.loading-label {
+    -fx-font-size: 16px;
+    -fx-text-fill: #ff6b6b;
+    -fx-padding: 30;
+}
+
+.error-container {
+    -fx-background-color: #ffe6e6;
+    -fx-background-radius: 10;
+    -fx-border-color: #ff6b6b;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 20;
+    -fx-max-width: 400;
+}
+
+.error-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ff6b6b;
+}
+
+.error-message {
+    -fx-font-size: 14px;
+    -fx-text-fill: #666666;
+    -fx-wrap-text: true;
+    -fx-text-alignment: center;
+}
+
+.retry-button {
+    -fx-background-color: #ff6b6b;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-padding: 8 16;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+
+.retry-button:hover {
+    -fx-background-color: #ff5252;
+}
+
+/* Footer */
+.lobby-footer {
+    -fx-background-color: rgba(255, 255, 255, 0.9);
+    -fx-background-radius: 10;
+    -fx-padding: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 5, 0, 0, 2);
+}
+
+.back-button {
+    -fx-background-color: #6c757d;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-padding: 10 20;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 5, 0, 0, 2);
+}
+
+.back-button:hover {
+    -fx-background-color: #5a6268;
+}
+
+/* Create game modal styles - align with app style */
+.create-game-modal {
+    -fx-background-color: white;
+    -fx-background-radius: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 20, 0, 0, 10);
+}
+
+.modal-title {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+    -fx-text-alignment: center;
+}
+
+.game-type-button {
+    -fx-background-color: #ff6b6b;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 16px;
+    -fx-padding: 15 30;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 5, 0, 0, 2);
+}
+
+.game-type-button:hover {
+    -fx-background-color: #ff5252;
+}
+
+.cancel-button {
+    -fx-background-color: #6c757d;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-padding: 10 20;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+.cancel-button:hover {
+    -fx-background-color: #5a6268;
+} 

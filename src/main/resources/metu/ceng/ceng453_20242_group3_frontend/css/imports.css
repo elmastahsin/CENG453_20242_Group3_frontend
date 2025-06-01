@@ -15,6 +15,9 @@
 /* Import game mode selection styles */
 @import "game-mode.css";
 
+/* Import lobby styles */
+@import "lobby.css";
+
 /* Import game styles */
 @import "game.css";
 

@@ -6,7 +6,7 @@ package metu.ceng.ceng453_20242_group3_frontend.config;
  */
 public class AppConfig {
     // API endpoints
-    public static final String BASE_API_URL = "https://ceng-453-group-3.onrender.com/api";
+    public static final String BASE_API_URL = "http://localhost:8080/api";
     
     // Authentication endpoints
     public static final String LOGIN_ENDPOINT = BASE_API_URL + "/auth/login";
@@ -35,8 +35,8 @@ public class AppConfig {
     public static final int CARD_ACTION_COUNT = 2; // Number of each action card per color
     
     // UI constants
-    public static final int WINDOW_WIDTH = 1024;
-    public static final int WINDOW_HEIGHT = 768;
+    public static final int WINDOW_WIDTH = 1920;
+    public static final int WINDOW_HEIGHT = 1080;
     public static final String GAME_TITLE = "UNO Game";
     
     // Backward compatibility aliases

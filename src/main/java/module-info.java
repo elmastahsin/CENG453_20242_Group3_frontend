@@ -15,6 +15,7 @@ module metu.ceng.ceng453_20242_group3_frontend {
     requires java.net.http;
     requires com.google.gson;
     requires com.fasterxml.jackson.databind;
+    requires org.java_websocket;
 
     // App package
     exports metu.ceng.ceng453_20242_group3_frontend.app;

@@ -36,6 +36,8 @@ import java.util.List;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import metu.ceng.ceng453_20242_group3_frontend.features.common.util.ApiClient;
+import metu.ceng.ceng453_20242_group3_frontend.features.game.controller.LobbyController;
+import metu.ceng.ceng453_20242_group3_frontend.features.common.util.WebSocketManager;
 
 /**
  * Controller for the game view.
@@ -121,11 +123,17 @@ public class GameController {
     private boolean isGameRunning = true;
     private boolean firstCardPlayed = false;
     
-    // Store game ID received from the server
+    // Store game information for API calls
     private Integer gameId;
+    private String gameType;
+    private String gameStartTime;
+    private boolean isMultiplayerGame = false;
     
     // API client for backend communication
     private ApiClient apiClient;
+    
+    // WebSocket manager for multiplayer communication
+    private WebSocketManager webSocketManager;
     
     // Legacy fields to be removed after full refactoring
     private List<ComputerAIPlayer> aiPlayers = new ArrayList<>();
@@ -158,6 +166,9 @@ public class GameController {
         
         // Initialize API client
         apiClient = new ApiClient();
+        
+        // Initialize WebSocket manager
+        webSocketManager = new WebSocketManager();
         
         // Initialize cheat buttons
         initializeCheatButtons();
@@ -200,9 +211,21 @@ public class GameController {
             default -> PlayerCount.TWO;
         };
 
+        // Set game metadata
+        isMultiplayerGame = "multiplayer".equalsIgnoreCase(gameMode);
+        gameStartTime = java.time.Instant.now().toString();
+        
+        // Set game type based on player count
+        gameType = switch (aiPlayerCount + 1) {
+            case 2 -> "TWO_PLAYER";
+            case 3 -> "THREE_PLAYER";
+            case 4 -> "FOUR_PLAYER";
+            default -> "TWO_PLAYER";
+        };
+
         // Create a new game instance
         this.game = new Game(
-            "multiplayer".equalsIgnoreCase(gameMode) ? GameMode.MULTIPLAYER : GameMode.SINGLEPLAYER,
+            isMultiplayerGame ? GameMode.MULTIPLAYER : GameMode.SINGLEPLAYER,
             playerCount
         );
         
@@ -210,7 +233,18 @@ public class GameController {
         this.gameId = null;
         
         // Call the game start API
-        String requestBody = String.format("{\"gameType\": \"SINGLE_PLAYER\", \"multiplayer\": false}");
+        String requestBody = String.format("{\"gameType\": \"%s\", \"multiplayer\": %b}", 
+                                           isMultiplayerGame ? gameType : "SINGLE_PLAYER", 
+                                           isMultiplayerGame);
+        
+        System.out.println("=== STARTING GAME ===");
+        System.out.println("Game Mode: " + gameMode);
+        System.out.println("Game Type: " + gameType);
+        System.out.println("Multiplayer: " + isMultiplayerGame);
+        System.out.println("Start Time: " + gameStartTime);
+        System.out.println("API Request: " + requestBody);
+        System.out.println("====================");
+        
         apiClient.post("/game/start", requestBody, 
             response -> {
                 try {
@@ -964,19 +998,27 @@ public class GameController {
             winnerName = game.getWinner() != null ? game.getWinner().getName() : "AI Player";
         }
         
-        // Call the game end API if we have a valid game ID
-        if (gameId != null) {
-            String sanitizedWinnerName = winnerName.replace(" ", "");
-            String requestBody = String.format("{\"id\": %d, \"winnerUsername\": \"%s\"}", gameId, sanitizedWinnerName);
-            
-            apiClient.post("/game/end", requestBody, 
-                response -> System.out.println("Game end API called successfully: " + response),
-                error -> System.err.println("Failed to call game end API: " + error)
-            );
-        } else {
-            System.err.println("Cannot call game end API: No game ID available");
+        // Call the game end API with proper format
+        callGameEndAPI(winnerName);
+        
+        // For multiplayer games in waiting state, just navigate back to lobby
+        if (isMultiplayerGame && game.getPlayers().size() <= 1) {
+            System.out.println("Multiplayer game ending - returning to lobby");
+            navigateAfterGameEnd();
+            return;
         }
         
+        // For normal games, show the game over overlay
+        showGameOverOverlay(isPlayerWinner, winnerName);
+    }
+    
+    /**
+     * Shows the game over overlay with appropriate options.
+     * 
+     * @param isPlayerWinner Whether the player won
+     * @param winnerName The name of the winner
+     */
+    private void showGameOverOverlay(boolean isPlayerWinner, String winnerName) {
         // Use Platform.runLater to ensure UI updates happen on the JavaFX thread
         Platform.runLater(() -> {
             // Find the StackPane in the center of the grid (game table)
@@ -1013,22 +1055,42 @@ public class GameController {
                 buttonsBox.setAlignment(javafx.geometry.Pos.CENTER);
                 buttonsBox.setPadding(new javafx.geometry.Insets(20, 0, 0, 0));
                 
-                // Exit button
-                Button exitButton = new Button("EXIT GAME");
-                exitButton.setStyle("-fx-background-color: #F44336; -fx-text-fill: white; -fx-font-weight: bold; " +
-                        "-fx-font-size: 16px; -fx-padding: 15 30; -fx-background-radius: 10;");
-                exitButton.setOnAction(e -> navigateToMainMenu());
-                
-                // Add hover effects to button
-                exitButton.setOnMouseEntered(e -> 
-                    exitButton.setStyle("-fx-background-color: #EF5350; -fx-text-fill: white; -fx-font-weight: bold; " +
-                            "-fx-font-size: 16px; -fx-padding: 15 30; -fx-background-radius: 10;"));
-                exitButton.setOnMouseExited(e -> 
+                // Navigation buttons based on game type
+                if (isMultiplayerGame) {
+                    // For multiplayer games, go back to lobby
+                    Button backToLobbyButton = new Button("BACK TO LOBBY");
+                    backToLobbyButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold; " +
+                            "-fx-font-size: 16px; -fx-padding: 15 30; -fx-background-radius: 10;");
+                    backToLobbyButton.setOnAction(e -> navigateToLobby());
+                    
+                    Button exitButton = new Button("EXIT TO MENU");
                     exitButton.setStyle("-fx-background-color: #F44336; -fx-text-fill: white; -fx-font-weight: bold; " +
-                            "-fx-font-size: 16px; -fx-padding: 15 30; -fx-background-radius: 10;"));
-                
-                // Add button to container
-                buttonsBox.getChildren().add(exitButton);
+                            "-fx-font-size: 16px; -fx-padding: 15 30; -fx-background-radius: 10;");
+                    exitButton.setOnAction(e -> navigateToMainMenu());
+                    
+                    // Add hover effects
+                    addButtonHoverEffects(backToLobbyButton, "#66BB6A", "#4CAF50");
+                    addButtonHoverEffects(exitButton, "#EF5350", "#F44336");
+                    
+                    buttonsBox.getChildren().addAll(backToLobbyButton, exitButton);
+                } else {
+                    // For singleplayer games, go back to game mode selection
+                    Button playAgainButton = new Button("PLAY AGAIN");
+                    playAgainButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold; " +
+                            "-fx-font-size: 16px; -fx-padding: 15 30; -fx-background-radius: 10;");
+                    playAgainButton.setOnAction(e -> navigateToGameMode());
+                    
+                    Button exitButton = new Button("EXIT TO MENU");
+                    exitButton.setStyle("-fx-background-color: #F44336; -fx-text-fill: white; -fx-font-weight: bold; " +
+                            "-fx-font-size: 16px; -fx-padding: 15 30; -fx-background-radius: 10;");
+                    exitButton.setOnAction(e -> navigateToMainMenu());
+                    
+                    // Add hover effects
+                    addButtonHoverEffects(playAgainButton, "#66BB6A", "#4CAF50");
+                    addButtonHoverEffects(exitButton, "#EF5350", "#F44336");
+                    
+                    buttonsBox.getChildren().addAll(playAgainButton, exitButton);
+                }
                 
                 // Add all components to content
                 content.getChildren().addAll(gameOverLabel, winnerLabel, winnerNameLabel, buttonsBox);
@@ -1057,9 +1119,171 @@ public class GameController {
                 fadeIn.play();
             } else {
                 // Fallback to simple navigation if we can't find the game table
-                navigateToMainMenu();
+                navigateAfterGameEnd();
             }
         });
+    }
+    
+    /**
+     * Calls the game end API with the proper format.
+     * 
+     * @param winnerUsername The username of the winner
+     */
+    private void callGameEndAPI(String winnerUsername) {
+        if (gameId == null) {
+            System.err.println("Cannot call game end API: No game ID available");
+            return;
+        }
+        
+        try {
+            // Use current time for end date
+            String currentTime = java.time.Instant.now().toString();
+            
+            // Sanitize winner username (remove spaces and special characters)
+            String sanitizedWinnerName = winnerUsername.replaceAll("[^a-zA-Z0-9]", "");
+            if (sanitizedWinnerName.isEmpty()) {
+                sanitizedWinnerName = "UnknownWinner";
+            }
+            
+            // Prepare request body according to API specification
+            // Make sure we're ending the existing game, not creating a new one
+            String requestBody = String.format("""
+                {
+                  "id": %d,
+                  "status": "COMPLETED",
+                  "startDate": "%s",
+                  "endDate": "%s",
+                  "gameType": "%s",
+                  "topCardId": 0,
+                  "multiplayer": %b,
+                  "winnerUsername": "%s"
+                }
+                """, 
+                gameId, 
+                gameStartTime != null ? gameStartTime : currentTime, 
+                currentTime, 
+                gameType != null ? gameType : "SINGLE_PLAYER", 
+                isMultiplayerGame, 
+                sanitizedWinnerName
+            );
+            
+            System.out.println("=== ENDING GAME ===");
+            System.out.println("Game ID: " + gameId);
+            System.out.println("Winner: " + sanitizedWinnerName);
+            System.out.println("Multiplayer: " + isMultiplayerGame);
+            System.out.println("Status: COMPLETED (ending existing game)");
+            System.out.println("Request: " + requestBody);
+            System.out.println("==================");
+            
+            apiClient.post("/game/end", requestBody, 
+                response -> {
+                    System.out.println("Game end API response: " + response);
+                    // Parse response to ensure game was ended properly
+                    try {
+                        ObjectMapper objectMapper = new ObjectMapper();
+                        JsonNode root = objectMapper.readTree(response);
+                        if (root.has("status") && root.get("status").has("code")) {
+                            String statusCode = root.get("status").get("code").asText();
+                            if ("OK".equals(statusCode)) {
+                                System.out.println("✓ Game ended successfully on server");
+                                // Clear the game ID to prevent further API calls
+                                gameId = null;
+                            } else {
+                                System.err.println("✗ Game end API returned error: " + response);
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.println("✗ Error parsing game end response: " + e.getMessage());
+                    }
+                },
+                error -> {
+                    System.err.println("✗ Failed to call game end API: " + error);
+                    // Clear the game ID even on error to prevent retries
+                    gameId = null;
+                }
+            );
+        } catch (Exception e) {
+            System.err.println("✗ Error preparing game end request: " + e.getMessage());
+            e.printStackTrace();
+            // Clear the game ID on error
+            gameId = null;
+        }
+    }
+    
+    /**
+     * Adds hover effects to a button.
+     * 
+     * @param button The button to add effects to
+     * @param hoverColor The color when hovering
+     * @param normalColor The normal color
+     */
+    private void addButtonHoverEffects(Button button, String hoverColor, String normalColor) {
+        button.setOnMouseEntered(e -> 
+            button.setStyle(button.getStyle().replace(normalColor, hoverColor)));
+        button.setOnMouseExited(e -> 
+            button.setStyle(button.getStyle().replace(hoverColor, normalColor)));
+    }
+    
+    /**
+     * Navigates to the multiplayer lobby.
+     */
+    private void navigateToLobby() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/lobby-view.fxml"));
+            Parent root = loader.load();
+            
+            // Get the lobby controller and refresh the games list
+            LobbyController lobbyController = loader.getController();
+            if (lobbyController != null) {
+                // Refresh the lobby to show current available games
+                Platform.runLater(() -> {
+                    lobbyController.refreshLobby();
+                    System.out.println("✓ Lobby refreshed after returning from multiplayer game");
+                });
+            }
+            
+            Scene scene = new Scene(root);
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
+            Stage stage = (Stage) gamePane.getScene().getWindow();
+            stage.setScene(scene);
+            
+            System.out.println("Navigated back to multiplayer lobby with refreshed data");
+        } catch (IOException e) {
+            System.err.println("Error navigating to lobby: " + e.getMessage());
+            e.printStackTrace();
+            // Fallback to main menu
+            navigateToMainMenu();
+        }
+    }
+    
+    /**
+     * Navigates to the game mode selection.
+     */
+    private void navigateToGameMode() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/game-mode-view.fxml"));
+            Parent root = loader.load();
+            
+            Scene scene = new Scene(root);
+            URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+            
+            Stage stage = (Stage) gamePane.getScene().getWindow();
+            stage.setScene(scene);
+            
+            System.out.println("Navigated back to game mode selection");
+        } catch (IOException e) {
+            System.err.println("Error navigating to game mode: " + e.getMessage());
+            e.printStackTrace();
+            // Fallback to main menu
+            navigateToMainMenu();
+        }
     }
     
     /**
@@ -1111,12 +1335,66 @@ public class GameController {
             // Handle the user's response
             alert.showAndWait().ifPresent(response -> {
                 if (response == javafx.scene.control.ButtonType.YES) {
-                    navigateToMainMenu();
+                    // Force end the game properly
+                    forceEndGame();
                 }
             });
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+    
+    /**
+     * Forces the game to end (used for manual exits).
+     */
+    private void forceEndGame() {
+        // Stop the game immediately
+        isGameRunning = false;
+        
+        // Disconnect WebSocket if connected
+        if (webSocketManager != null && webSocketManager.isConnected()) {
+            System.out.println("Disconnecting WebSocket...");
+            webSocketManager.disconnect();
+        }
+        
+        // End the game via API if we have a game ID
+        if (gameId != null) {
+            // For manual exit, determine winner based on game type
+            String winnerUsername;
+            
+            if (isMultiplayerGame) {
+                // For multiplayer games, use the current user as winner (forfeit by others)
+                winnerUsername = SessionManager.getInstance().getCurrentUser().getUsername();
+            } else {
+                // For singleplayer games, pick an AI winner to indicate player forfeit
+                winnerUsername = "SystemWin"; // Neutral system win for forfeit
+            }
+            
+            System.out.println("=== FORCE ENDING GAME ===");
+            System.out.println("Game ID: " + gameId);
+            System.out.println("Multiplayer: " + isMultiplayerGame);
+            System.out.println("Force Winner: " + winnerUsername);
+            System.out.println("========================");
+            
+            // Call the end game API
+            callGameEndAPI(winnerUsername);
+        }
+        
+        // Navigate immediately without waiting for API response
+        navigateAfterGameEnd();
+    }
+    
+    /**
+     * Handles navigation after game ends (either natural or forced).
+     */
+    private void navigateAfterGameEnd() {
+        Platform.runLater(() -> {
+            if (isMultiplayerGame) {
+                navigateToLobby();
+            } else {
+                navigateToMainMenu();
+            }
+        });
     }
     
     /**
@@ -1302,5 +1580,199 @@ public class GameController {
             // Play the card using the main card play functionality
             finishCardPlay(cardView, card);
         }
+    }
+    
+    /**
+     * Initializes a multiplayer game with existing game ID and type.
+     * This is called when joining a game from the lobby.
+     * 
+     * @param joinedGameId The ID of the game that was joined
+     * @param joinedGameType The type of the game (TWO_PLAYER, THREE_PLAYER, FOUR_PLAYER)
+     */
+    public void initializeMultiplayerGame(Integer joinedGameId, String joinedGameType) {
+        // Set multiplayer game metadata
+        this.gameId = joinedGameId;
+        this.gameType = joinedGameType;
+        this.isMultiplayerGame = true;
+        this.gameStartTime = java.time.Instant.now().toString();
+        
+        System.out.println("=== INITIALIZING MULTIPLAYER GAME ===");
+        System.out.println("Joined Game ID: " + joinedGameId);
+        System.out.println("Game Type: " + joinedGameType);
+        System.out.println("=====================================");
+        
+        // For multiplayer games, we DON'T create AI players
+        // Instead, we wait for real players to join via WebSocket
+        // For now, just show a waiting screen or lobby-like interface
+        
+        // Initialize basic game state without AI players
+        initializeMultiplayerGameState(joinedGameType);
+        
+        System.out.println("Multiplayer game initialized - waiting for other players to join!");
+    }
+    
+    /**
+     * Initializes the basic multiplayer game state without AI players.
+     * 
+     * @param gameType The type of game (TWO_PLAYER, THREE_PLAYER, FOUR_PLAYER)
+     */
+    private void initializeMultiplayerGameState(String gameType) {
+        // Create PlayerCount enum
+        PlayerCount playerCount = switch (gameType) {
+            case "TWO_PLAYER" -> PlayerCount.TWO;
+            case "THREE_PLAYER" -> PlayerCount.THREE;
+            case "FOUR_PLAYER" -> PlayerCount.FOUR;
+            default -> PlayerCount.TWO;
+        };
+
+        // Create a new game instance for multiplayer (no AI players)
+        this.game = new Game(GameMode.MULTIPLAYER, playerCount);
+        
+        // Add only the human player
+        String username = SessionManager.getInstance().isLoggedIn() ? 
+                          SessionManager.getInstance().getCurrentUser().getUsername() : 
+                          "Player";
+        Player humanPlayer = new Player(username);
+        game.addPlayer(humanPlayer);
+        
+        // Set player name in UI
+        bottomPlayerNameLabel.setText(username);
+        
+        // Initialize sub-controllers
+        notificationManager = new NotificationManager(gamePane);
+        unoIndicatorManager = new UnoIndicatorManager(
+            topPlayerNameLabel,
+            leftPlayerNameLabel,
+            rightPlayerNameLabel,
+            bottomPlayerNameLabel
+        );
+        
+        gameTableController = new GameTableController(
+            gamePane,
+            topPlayerArea,
+            leftPlayerArea,
+            rightPlayerArea,
+            bottomPlayerArea
+        );
+        
+        cardAnimationController = new CardAnimationController(gamePane, discardPileContainer);
+        
+        // Set up multiplayer waiting state
+        setupMultiplayerWaitingState();
+    }
+    
+    /**
+     * Sets up the UI for waiting for other players in multiplayer.
+     */
+    private void setupMultiplayerWaitingState() {
+        // Hide all opponent areas initially
+        topPlayerArea.setVisible(false);
+        leftPlayerArea.setVisible(false);
+        rightPlayerArea.setVisible(false);
+        
+        // Show waiting message
+        currentTurnLabel.setText("WAITING FOR PLAYERS...");
+        currentTurnLabel.setStyle("-fx-background-color: rgba(255, 193, 7, 0.9); -fx-font-size: 20px; -fx-font-weight: bold; -fx-border-color: white; -fx-border-width: 2px; -fx-border-radius: 20px;");
+        
+        // Clear game areas
+        bottomPlayerCardsContainer.getChildren().clear();
+        drawPileContainer.getChildren().clear();
+        discardPileContainer.getChildren().clear();
+        
+        // Set up WebSocket callback for multiplayer events
+        webSocketManager.setCallback(new WebSocketManager.WebSocketCallback() {
+            @Override
+            public void onConnected() {
+                System.out.println("✓ WebSocket connected for multiplayer game");
+                Platform.runLater(() -> {
+                    currentTurnLabel.setText("CONNECTED - WAITING FOR PLAYERS...");
+                    notificationManager.showActionNotification("", "Connected to multiplayer server!");
+                });
+            }
+            
+            @Override
+            public void onDisconnected() {
+                System.out.println("✗ WebSocket disconnected from multiplayer game");
+                Platform.runLater(() -> {
+                    currentTurnLabel.setText("DISCONNECTED - RECONNECTING...");
+                    notificationManager.showActionNotification("", "Disconnected from server. Trying to reconnect...");
+                });
+            }
+            
+            @Override
+            public void onGameStateReceived(String gameState) {
+                System.out.println("📊 GAME STATE UPDATE:");
+                System.out.println(gameState);
+                
+                // For now, just show the received game state in notifications
+                Platform.runLater(() -> {
+                    notificationManager.showActionNotification("", "Game state updated (see console)");
+                });
+                
+                // TODO: Parse game state and update UI accordingly
+            }
+            
+            @Override
+            public void onPlayerJoined(String playerName) {
+                System.out.println("👤 Player joined: " + playerName);
+                Platform.runLater(() -> {
+                    notificationManager.showActionNotification("", playerName + " joined the game!");
+                    // TODO: Update UI to show the new player
+                });
+            }
+            
+            @Override
+            public void onPlayerLeft(String playerName) {
+                System.out.println("👤 Player left: " + playerName);
+                Platform.runLater(() -> {
+                    notificationManager.showActionNotification("", playerName + " left the game.");
+                    // TODO: Update UI to remove the player
+                });
+            }
+            
+            @Override
+            public void onGameMove(String moveData) {
+                System.out.println("🎯 Game move received:");
+                System.out.println(moveData);
+                Platform.runLater(() -> {
+                    notificationManager.showActionNotification("", "Player made a move (see console)");
+                    // TODO: Parse and apply the move to the game
+                });
+            }
+            
+            @Override
+            public void onError(String error) {
+                System.err.println("❌ WebSocket error: " + error);
+                Platform.runLater(() -> {
+                    notificationManager.showActionNotification("", "Connection error: " + error);
+                });
+            }
+        });
+        
+        // Connect to WebSocket if we have a game ID
+        if (gameId != null) {
+            String username = SessionManager.getInstance().getCurrentUser().getUsername();
+            
+            System.out.println("=== CONNECTING TO WEBSOCKET ===");
+            System.out.println("Game ID: " + gameId);
+            System.out.println("Username: " + username);
+            System.out.println("===============================");
+            
+            // Connect in a separate thread to avoid blocking UI
+            new Thread(() -> {
+                boolean connected = webSocketManager.connectAndJoinGame(gameId, username);
+                if (!connected) {
+                    Platform.runLater(() -> {
+                        notificationManager.showActionNotification("", "Failed to connect to multiplayer server!");
+                        currentTurnLabel.setText("CONNECTION FAILED");
+                    });
+                }
+            }).start();
+        } else {
+            System.err.println("Cannot connect to WebSocket: No game ID available");
+            notificationManager.showActionNotification("", "Error: No game ID for multiplayer connection");
+        }
+        
+        System.out.println("Multiplayer waiting state initialized with WebSocket");
     }
 } 
