@@ -1232,16 +1232,6 @@ public class GameController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/lobby-view.fxml"));
             Parent root = loader.load();
             
-            // Get the lobby controller and refresh the games list
-            LobbyController lobbyController = loader.getController();
-            if (lobbyController != null) {
-                // Refresh the lobby to show current available games
-                Platform.runLater(() -> {
-                    lobbyController.refreshLobby();
-                    System.out.println("✓ Lobby refreshed after returning from multiplayer game");
-                });
-            }
-            
             Scene scene = new Scene(root);
             URL cssUrl = getClass().getResource("/metu/ceng/ceng453_20242_group3_frontend/css/imports.css");
             if (cssUrl != null) {
@@ -1251,7 +1241,19 @@ public class GameController {
             Stage stage = (Stage) gamePane.getScene().getWindow();
             stage.setScene(scene);
             
-            System.out.println("Navigated back to multiplayer lobby with refreshed data");
+            // Get the lobby controller and refresh AFTER scene is set
+            LobbyController lobbyController = loader.getController();
+            if (lobbyController != null) {
+                // Use Platform.runLater to ensure UI is fully loaded before refresh
+                Platform.runLater(() -> {
+                    lobbyController.refreshLobby();
+                    System.out.println("✓ Lobby refreshed after navigation from multiplayer game");
+                });
+            } else {
+                System.err.println("✗ Failed to get lobby controller for refresh");
+            }
+            
+            System.out.println("Navigated back to multiplayer lobby");
         } catch (IOException e) {
             System.err.println("Error navigating to lobby: " + e.getMessage());
             e.printStackTrace();

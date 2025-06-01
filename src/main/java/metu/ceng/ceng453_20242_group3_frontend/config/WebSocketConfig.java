@@ -6,8 +6,11 @@ package metu.ceng.ceng453_20242_group3_frontend.config;
  */
 public class WebSocketConfig {
     
-    // Base WebSocket URL
-    public static final String WEBSOCKET_BASE_URL = "ws://localhost:8080/ws";
+    // Base WebSocket URL - using SockJS endpoint
+    public static final String WEBSOCKET_BASE_URL = "ws://localhost:8080/ws/websocket";
+    
+    // Alternative SockJS URL if needed
+    public static final String SOCKJS_BASE_URL = "ws://localhost:8080/ws";
     
     // WebSocket endpoint patterns
     public static final String GAME_JOIN_ENDPOINT = "game/%d/join";
