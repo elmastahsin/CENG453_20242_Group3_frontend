@@ -11,6 +11,7 @@ public class Card {
     private final CardAction action;
     private final int value; // Relevant for number cards (0-9)
     private boolean playable;
+    private Integer id; // Backend card ID for multiplayer games
 
     /**
      * Constructor for creating a number card.
@@ -24,6 +25,7 @@ public class Card {
         this.action = CardAction.NONE;
         this.value = value;
         this.playable = false;
+        this.id = null;
     }
 
     /**
@@ -33,6 +35,39 @@ public class Card {
      * @param action The action of the card
      */
     public Card(CardColor color, CardAction action) {
+        this.color = color;
+        this.type = action.isWildAction() ? CardType.WILDCARD : CardType.STANDARD;
+        this.action = action;
+        this.value = -1; // Action cards don't have a value
+        this.playable = false;
+        this.id = null;
+    }
+
+    /**
+     * Constructor with ID for multiplayer games.
+     *
+     * @param id The backend card ID
+     * @param color The color of the card
+     * @param value The value of the card (for number cards)
+     */
+    public Card(Integer id, CardColor color, int value) {
+        this.id = id;
+        this.color = color;
+        this.type = CardType.STANDARD;
+        this.action = CardAction.NONE;
+        this.value = value;
+        this.playable = false;
+    }
+
+    /**
+     * Constructor with ID for action cards in multiplayer games.
+     *
+     * @param id The backend card ID
+     * @param color  The color of the card
+     * @param action The action of the card
+     */
+    public Card(Integer id, CardColor color, CardAction action) {
+        this.id = id;
         this.color = color;
         this.type = action.isWildAction() ? CardType.WILDCARD : CardType.STANDARD;
         this.action = action;
@@ -54,6 +89,14 @@ public class Card {
 
     public int getValue() {
         return value;
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
     }
 
     public boolean isNumberCard() {
@@ -78,25 +121,28 @@ public class Card {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
         Card card = (Card) o;
-        return value == card.value && color == card.color && type == card.type && action == card.action;
+        return value == card.value &&
+               playable == card.playable &&
+               color == card.color &&
+               type == card.type &&
+               action == card.action &&
+               Objects.equals(id, card.id);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(color, type, action, value);
+        return Objects.hash(color, type, action, value, playable, id);
     }
 
     @Override
     public String toString() {
         if (isNumberCard()) {
-            return color + " " + value;
+            return color + " " + value + (id != null ? " (ID:" + id + ")" : "");
         } else {
-            return color + " " + action;
+            return color + " " + action + (id != null ? " (ID:" + id + ")" : "");
         }
     }
 }

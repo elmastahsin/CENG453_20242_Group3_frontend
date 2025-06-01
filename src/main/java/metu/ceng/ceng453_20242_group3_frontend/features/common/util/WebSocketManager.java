@@ -147,7 +147,22 @@ public class WebSocketManager {
                 public void onMessage(String message) {
                     System.out.println("=== WEBSOCKET MESSAGE RECEIVED ===");
                     System.out.println("Raw message: " + message);
-
+                    
+                    // 🔍 ENHANCED DEBUGGING: Log ALL message characteristics
+                    System.out.println("🔍 MESSAGE ANALYSIS:");
+                    System.out.println("   Length: " + message.length());
+                    System.out.println("   Type: " + (message.startsWith("CONNECTED") ? "CONNECTED" : 
+                                                   message.startsWith("MESSAGE") ? "MESSAGE" : 
+                                                   message.startsWith("ERROR") ? "ERROR" : 
+                                                   message.startsWith("RECEIPT") ? "RECEIPT" : "UNKNOWN"));
+                    System.out.println("   Contains 'lobby': " + message.contains("lobby"));
+                    System.out.println("   Contains 'start': " + message.contains("start"));
+                    System.out.println("   Contains 'move': " + message.contains("move"));
+                    System.out.println("   Contains 'firstPlayer': " + message.contains("firstPlayer"));
+                    System.out.println("   Contains 'players': " + message.contains("players"));
+                    System.out.println("   Contains 'ready': " + message.contains("ready"));
+                    System.out.println("================================");
+                    
                     handleIncomingMessage(message);
                 }
 
@@ -208,25 +223,24 @@ public class WebSocketManager {
     }
 
     /**
-     * Sends a join game message to the WebSocket server using STOMP protocol.
-     *
+     * Joins a game by sending the join message and subscribing to game topics.
+     * 
      * @param gameId The game ID to join
-     * @param username The username of the player
+     * @param username The username of the player joining
      */
     private void joinGame(int gameId, String username) {
-        if (!isConnected) {
-            System.err.println("Cannot send join message - not connected");
-            return;
-        }
-
         try {
+            // Store current game info
+            currentGameId = gameId;
+            currentUsername = username;
+            
             // Send STOMP CONNECT frame first
             String connectFrame = "CONNECT\n" +
                                 "accept-version:1.1,1.0\n" +
                                 "heart-beat:10000,10000\n" +
                                 "\n" +
                                 "\0";
-
+            
             System.out.println("=== SENDING STOMP CONNECT ===");
             System.out.println(connectFrame);
             System.out.println("============================");
@@ -236,6 +250,85 @@ public class WebSocketManager {
             // Wait longer for STOMP connection to be established
             Thread.sleep(2000);
 
+            // 🔧 CRITICAL FIX: Subscribe BEFORE joining to avoid missing broadcasts
+            System.out.println("🔧 === SUBSCRIBING BEFORE JOINING ===");
+            System.out.println("This ensures we don't miss any broadcasts");
+            System.out.println("====================================");
+            
+            // Send SUBSCRIBE frame to receive game state updates (lobby) FIRST
+            String lobbyDestination = "/topic/game/" + gameId + "/lobby";
+            String lobbySubscribeId = "sub-lobby-" + gameId;
+            String lobbySubscribeFrame = "SUBSCRIBE\n" +
+                                        "id:" + lobbySubscribeId + "\n" +
+                                        "destination:" + lobbyDestination + "\n" +
+                                        "\n" +
+                                        "\0";
+            System.out.println("=== SENDING STOMP SUBSCRIBE (LOBBY) ===");
+            System.out.println("Game ID: " + gameId);
+            System.out.println("Subscribe ID: " + lobbySubscribeId);
+            System.out.println("Subscribe Destination: " + lobbyDestination);
+            System.out.println("STOMP Frame:");
+            System.out.println(lobbySubscribeFrame);
+            System.out.println("===============================");
+            webSocketClient.send(lobbySubscribeFrame);
+            
+            // Send SUBSCRIBE frame to receive game start event
+            String startDestination = "/topic/game/" + gameId + "/start";
+            String startSubscribeId = "sub-start-" + gameId;
+            String startSubscribeFrame = "SUBSCRIBE\n" +
+                                        "id:" + startSubscribeId + "\n" +
+                                        "destination:" + startDestination + "\n" + 
+                                        "\n" +
+                                        "\0";
+            System.out.println("=== SENDING STOMP SUBSCRIBE (START) ===");
+            System.out.println("Game ID: " + gameId);
+            System.out.println("Subscribe ID: " + startSubscribeId);
+            System.out.println("Subscribe Destination: " + startDestination);
+            System.out.println("STOMP Frame:");
+            System.out.println(startSubscribeFrame);
+            System.out.println("===============================");
+            webSocketClient.send(startSubscribeFrame);
+            
+            // Subscribe to game moves
+            String moveDestination = "/topic/game/" + gameId + "/move";
+            String moveSubscribeId = "sub-move-" + gameId;
+            String moveSubscribeFrame = "SUBSCRIBE\n" +
+                                       "id:" + moveSubscribeId + "\n" +
+                                       "destination:" + moveDestination + "\n" +
+                                       "\n" +
+                                       "\0";
+            System.out.println("=== SENDING STOMP SUBSCRIBE (MOVES) ===");
+            System.out.println("Game ID: " + gameId);
+            System.out.println("Subscribe ID: " + moveSubscribeId);
+            System.out.println("Subscribe Destination: " + moveDestination);
+            System.out.println("STOMP Frame:");
+            System.out.println(moveSubscribeFrame);
+            System.out.println("===============================");
+            webSocketClient.send(moveSubscribeFrame);
+            
+            // Subscribe to game state updates (where backend broadcasts moves)
+            String stateDestination = "/topic/game/" + gameId + "/state";
+            String stateSubscribeId = "sub-state-" + gameId;
+            String stateSubscribeFrame = "SUBSCRIBE\n" +
+                                        "id:" + stateSubscribeId + "\n" +
+                                        "destination:" + stateDestination + "\n" +
+                                        "\n" +
+                                        "\0";
+            System.out.println("=== SENDING STOMP SUBSCRIBE (STATE) ===");
+            System.out.println("Game ID: " + gameId);
+            System.out.println("Subscribe ID: " + stateSubscribeId);
+            System.out.println("Subscribe Destination: " + stateDestination);
+            System.out.println("STOMP Frame:");
+            System.out.println(stateSubscribeFrame);
+            System.out.println("===============================");
+            webSocketClient.send(stateSubscribeFrame);
+            
+            // Wait for subscriptions to be registered on server
+            Thread.sleep(1000);
+
+            // NOW send join message AFTER subscriptions are active
+            System.out.println("📡 === NOW JOINING AFTER SUBSCRIPTIONS ===");
+
             // Send STOMP SEND frame to join game
             String destination = "/app/game/" + gameId + "/join";
             String sendFrame = "SEND\n" +
@@ -244,7 +337,7 @@ public class WebSocketManager {
                               "\n" +
                               "{\"username\":\"" + username + "\"}\n" +
                               "\0";
-
+            
             System.out.println("=== SENDING STOMP JOIN GAME MESSAGE ===");
             System.out.println("Game ID: " + gameId);
             System.out.println("Username: " + username);
@@ -255,44 +348,14 @@ public class WebSocketManager {
 
             webSocketClient.send(sendFrame);
 
-            // Wait longer for join to be processed by server
-            Thread.sleep(1500);
-
-            // Send SUBSCRIBE frame to receive game state updates (lobby)
-            String subscribeDestination = "/topic/game/" + gameId + "/lobby";
-            String subscribeId = "sub-game-" + gameId;
-            String subscribeFrame = "SUBSCRIBE\n" +
-                                   "id:" + subscribeId + "\n" +
-                                   "destination:" + subscribeDestination + "\n" +
-                                   "\n" +
-                                   "\0";
-            System.out.println("=== SENDING STOMP SUBSCRIBE ===");
-            System.out.println("Game ID: " + gameId);
-            System.out.println("Subscribe ID: " + subscribeId);
-            System.out.println("Subscribe Destination: " + subscribeDestination);
-            System.out.println("STOMP Frame:");
-            System.out.println(subscribeFrame);
-            System.out.println("===============================");
-            webSocketClient.send(subscribeFrame);
-
-            // Send SUBSCRIBE frame to receive game start event
-            String startSubscribeDestination = "/topic/game/" + gameId + "/start";
-            String startSubscribeId = "sub-game-" + gameId + "-start";
-            String startSubscribeFrame = "SUBSCRIBE\n" + "id:" + startSubscribeId + "\n" + "destination:" + startSubscribeDestination + "\n" + "\n" + "\0";
-            System.out.println("=== SENDING STOMP SUBSCRIBE (START) ===");
-            System.out.println("Game ID: " + gameId);
-            System.out.println("Subscribe ID: " + startSubscribeId);
-            System.out.println("Subscribe Destination: " + startSubscribeDestination);
-            System.out.println("STOMP Frame:");
-            System.out.println(startSubscribeFrame);
-            System.out.println("===============================");
-            webSocketClient.send(startSubscribeFrame);
-
             System.out.println("✅ ALL STOMP FRAMES SENT SUCCESSFULLY");
             System.out.println("- CONNECT frame sent");
             System.out.println("- SEND (join game) frame sent");
+            System.out.println("- SUBSCRIBE (lobby state) frame sent");
+            System.out.println("- SUBSCRIBE (game start) frame sent");
+            System.out.println("- SUBSCRIBE (game moves) frame sent");
             System.out.println("- SUBSCRIBE (game state) frame sent");
-            System.out.println("Now waiting for game state updates...");
+            System.out.println("Now waiting for lobby updates and game start events...");
 
             // Start a timeout timer to check for game state updates
             new Thread(() -> {
@@ -308,18 +371,31 @@ public class WebSocketManager {
                         System.out.println("Connection is still active - will continue listening...");
                         System.out.println("=====================================");
 
-                        // Try to manually request game state
+                        // Try multiple approaches to get game state
+                        System.out.println("🔧 === TRYING ALTERNATIVE APPROACHES ===");
+                        
+                        // 1. Manual request for game state
                         requestGameState(gameId);
+                        
+                        // 2. Try requesting lobby state specifically
+                        requestLobbyState(gameId);
+                        
+                        // 3. Try re-subscribing in case first subscription failed
+                        resubscribeToGameTopics(gameId);
+                        
+                        System.out.println("========================================");
                     }
                 } catch (InterruptedException e) {
                     // Thread interrupted, ignore
                 }
             }).start();
-
+            
         } catch (Exception e) {
-            System.err.println("✗ Failed to send STOMP join game message: " + e.getMessage());
+            System.err.println("❌ Error joining game via WebSocket: " + e.getMessage());
             e.printStackTrace();
-
+            if (callback != null) {
+                callback.onError("Failed to join game: " + e.getMessage());
+            }
         }
     }
 
@@ -347,7 +423,7 @@ public class WebSocketManager {
 
     /**
      * Handles incoming WebSocket messages (STOMP protocol).
-     *
+     * 
      * @param message The raw message received from the server
      */
     private void handleIncomingMessage(String message) {
@@ -355,7 +431,7 @@ public class WebSocketManager {
             System.out.println("=== PROCESSING STOMP MESSAGE ===");
             System.out.println("Content: " + message);
             System.out.println("===============================");
-
+            
             // Parse STOMP frame
             if (message.startsWith("CONNECTED")) {
                 System.out.println("✅ STOMP Connected successfully");
@@ -373,6 +449,7 @@ public class WebSocketManager {
                 }
                 return;
             }
+            
             if (message.startsWith("ERROR")) {
                 System.err.println("❌ STOMP ERROR received:");
                 System.err.println(message);
@@ -387,60 +464,13 @@ public class WebSocketManager {
                 }
                 return;
             }
+            
             if (message.startsWith("MESSAGE")) {
                 System.out.println("📨 STOMP MESSAGE received:");
-                // Parse STOMP MESSAGE frame headers and body
-                String[] lines = message.split("\n");
-                String destination = null;
-                String subscriptionId = null;
-                boolean inBody = false;
-                StringBuilder jsonPayload = new StringBuilder();
-                for (String line : lines) {
-                    if (inBody) {
-                        if (!line.equals("\0")) {
-                            jsonPayload.append(line).append("\n");
-                        }
-                    } else if (line.startsWith("destination:")) {
-                        destination = line.substring(12);
-                        System.out.println("📍 Message destination: " + destination);
-                    } else if (line.startsWith("subscription:")) {
-                        subscriptionId = line.substring(13);
-                        System.out.println("🆔 Subscription ID: " + subscriptionId);
-                    } else if (line.startsWith("content-type:")) {
-                        System.out.println("📄 Content-Type: " + line.substring(13));
-                    } else if (line.trim().isEmpty()) {
-                        inBody = true; // Empty line indicates start of body
-                        System.out.println("📄 Starting to parse message body...");
-                    }
-                }
-                String jsonContent = jsonPayload.toString().trim();
-                System.out.println("📋 JSON Content Length: " + jsonContent.length());
-                if (!jsonContent.isEmpty() && !jsonContent.equals("\0")) {
-                    System.out.println("🔍 Raw JSON Content:");
-                    System.out.println(jsonContent);
-                    System.out.println("========================");
-                    // Handle /start topic: transition UI to game state
-                    if (destination != null && destination.endsWith("/start")) {
-                        System.out.println("🚦 Game start event received! Transitioning UI to game state.");
-                        if (callback != null) {
-                            Platform.runLater(() -> callback.onGameStateReceived(jsonContent));
-                        }
-                        return;
-                    }
-                    // Handle /lobby topic: update lobby state
-                    if (destination != null && destination.endsWith("/lobby")) {
-                        System.out.println("👥 Lobby update received.");
-                        if (callback != null) {
-                            Platform.runLater(() -> callback.onGameStateReceived(jsonContent));
-                        }
-                        return;
-                    }
-                } else {
-                    System.out.println("⚠️ Empty or null message body received");
-                    System.out.println("This might be a heartbeat or acknowledgment message");
-                }
+                handleStompMessage(message);
                 return;
             }
+            
             if (message.startsWith("RECEIPT")) {
                 System.out.println("✅ STOMP RECEIPT received - operation confirmed");
                 String[] lines = message.split("\n");
@@ -451,17 +481,108 @@ public class WebSocketManager {
                 }
                 return;
             }
+            
             if (message.trim().isEmpty() || message.equals("\n") || message.equals("\0")) {
                 System.out.println("💓 Heartbeat or empty frame received");
                 return;
             }
+            
             System.out.println("❓ UNKNOWN STOMP FRAME TYPE:");
             System.out.println("First line: " + (message.contains("\n") ? message.split("\n")[0] : message));
             System.out.println("Full content: " + message);
+            
         } catch (Exception e) {
             System.err.println("❌ CRITICAL ERROR parsing STOMP message: " + e.getMessage());
             System.err.println("Raw message that caused error:");
             System.err.println(message);
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Handles STOMP MESSAGE frames by parsing the destination and routing appropriately.
+     * 
+     * @param message The STOMP MESSAGE frame
+     */
+    private void handleStompMessage(String message) {
+        try {
+            // Parse STOMP MESSAGE frame headers and body
+            String[] lines = message.split("\n");
+            String destination = null;
+            String subscriptionId = null;
+            boolean inBody = false;
+            StringBuilder jsonPayload = new StringBuilder();
+            
+            for (String line : lines) {
+                if (inBody) {
+                    if (!line.equals("\0")) {
+                        jsonPayload.append(line).append("\n");
+                    }
+                } else if (line.startsWith("destination:")) {
+                    destination = line.substring(12);
+                    System.out.println("📍 Message destination: " + destination);
+                } else if (line.startsWith("subscription:")) {
+                    subscriptionId = line.substring(13);
+                    System.out.println("🆔 Subscription ID: " + subscriptionId);
+                } else if (line.startsWith("content-type:")) {
+                    System.out.println("📄 Content-Type: " + line.substring(13));
+                } else if (line.trim().isEmpty()) {
+                    inBody = true; // Empty line indicates start of body
+                    System.out.println("📄 Starting to parse message body...");
+                }
+            }
+            
+            String jsonContent = jsonPayload.toString().trim();
+            System.out.println("📋 JSON Content Length: " + jsonContent.length());
+            
+            if (!jsonContent.isEmpty() && !jsonContent.equals("\0")) {
+                System.out.println("🔍 Raw JSON Content:");
+                System.out.println(jsonContent);
+                System.out.println("========================");
+                
+                // Handle /start topic: transition UI to game state
+                if (destination != null && destination.endsWith("/start")) {
+                    System.out.println("🚦 Game start event received! Transitioning UI to game state.");
+                    if (callback != null) {
+                        Platform.runLater(() -> callback.onGameStateReceived(jsonContent));
+                    }
+                    return;
+                }
+                
+                // Handle /lobby topic: update lobby state
+                if (destination != null && destination.endsWith("/lobby")) {
+                    System.out.println("👥 Lobby update received.");
+                    if (callback != null) {
+                        Platform.runLater(() -> callback.onGameStateReceived(jsonContent));
+                    }
+                    return;
+                }
+                
+                // Handle /move topic: process game moves
+                if (destination != null && destination.endsWith("/move")) {
+                    System.out.println("🎯 Game move received! Processing opponent move.");
+                    if (callback != null) {
+                        Platform.runLater(() -> callback.onGameMove(jsonContent));
+                    }
+                    return;
+                }
+                
+                // Handle /state topic: also process as game moves (backend broadcasts moves here)
+                if (destination != null && destination.endsWith("/state")) {
+                    System.out.println("🎯 Game state update received! Processing as potential move.");
+                    if (callback != null) {
+                        Platform.runLater(() -> callback.onGameMove(jsonContent));
+                    }
+                    return;
+                }
+                
+            } else {
+                System.out.println("⚠️ Empty or null message body received");
+                System.out.println("This might be a heartbeat or acknowledgment message");
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error parsing STOMP message: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -492,6 +613,138 @@ public class WebSocketManager {
             webSocketClient.send(sendFrame);
         } catch (Exception e) {
             System.err.println("✗ Failed to request game state: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void requestLobbyState(int gameId) {
+        if (!isConnected) {
+            System.err.println("Cannot request lobby state - not connected");
+            return;
+        }
+        
+        try {
+            System.out.println("🏛️ === MANUALLY REQUESTING LOBBY STATE ===");
+            
+            String destination = "/app/game/" + gameId + "/lobby";
+            String sendFrame = "SEND\n" +
+                              "destination:" + destination + "\n" +
+                              "content-type:application/json\n" +
+                              "\n" +
+                              "{}\n" +
+                              "\0";
+            
+            System.out.println("Destination: " + destination);
+            System.out.println("STOMP Frame:");
+            System.out.println(sendFrame);
+            System.out.println("==========================================");
+            
+            webSocketClient.send(sendFrame);
+            
+        } catch (Exception e) {
+            System.err.println("✗ Failed to request lobby state: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Re-subscribes to all game-related topics after connection issues.
+     * 
+     * @param gameId The game ID to subscribe to
+     */
+    private void resubscribeToGameTopics(int gameId) {
+        try {
+            System.out.println("🔄 === RE-SUBSCRIBING TO GAME TOPICS ===");
+            
+            // Re-subscribe to lobby updates
+            String lobbyDestination = "/topic/game/" + gameId + "/lobby";
+            String lobbySubscribeId = "resub-lobby-" + gameId + "-" + System.currentTimeMillis();
+            String lobbySubscribeFrame = "SUBSCRIBE\n" +
+                                        "destination:" + lobbyDestination + "\n" +
+                                        "id:" + lobbySubscribeId + "\n" +
+                                        "\n" +
+                                        "\0";
+            
+            System.out.println("Lobby destination: " + lobbyDestination);
+            System.out.println("Lobby subscribe ID: " + lobbySubscribeId);
+            webSocketClient.send(lobbySubscribeFrame);
+            
+            // Re-subscribe to game start events
+            String startDestination = "/topic/game/" + gameId + "/start";
+            String startSubscribeId = "resub-start-" + gameId + "-" + System.currentTimeMillis();
+            String startSubscribeFrame = "SUBSCRIBE\n" +
+                                        "destination:" + startDestination + "\n" +
+                                        "id:" + startSubscribeId + "\n" +
+                                        "\n" +
+                                        "\0";
+            
+            System.out.println("Start destination: " + startDestination);
+            System.out.println("Start subscribe ID: " + startSubscribeId);
+            webSocketClient.send(startSubscribeFrame);
+            
+            // Re-subscribe to game moves
+            String moveDestination = "/topic/game/" + gameId + "/move";
+            String moveSubscribeId = "resub-move-" + gameId + "-" + System.currentTimeMillis();
+            String moveSubscribeFrame = "SUBSCRIBE\n" +
+                                       "destination:" + moveDestination + "\n" +
+                                       "id:" + moveSubscribeId + "\n" +
+                                       "\n" +
+                                       "\0";
+            
+            System.out.println("Move destination: " + moveDestination);
+            System.out.println("Move subscribe ID: " + moveSubscribeId);
+            webSocketClient.send(moveSubscribeFrame);
+            
+            // Re-subscribe to game state updates (where backend broadcasts moves)
+            String stateDestination = "/topic/game/" + gameId + "/state";
+            String stateSubscribeId = "resub-state-" + gameId + "-" + System.currentTimeMillis();
+            String stateSubscribeFrame = "SUBSCRIBE\n" +
+                                        "destination:" + stateDestination + "\n" +
+                                        "id:" + stateSubscribeId + "\n" +
+                                        "\n" +
+                                        "\0";
+            
+            System.out.println("State destination: " + stateDestination);
+            System.out.println("State subscribe ID: " + stateSubscribeId);
+            webSocketClient.send(stateSubscribeFrame);
+            
+            System.out.println("========================================");
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error re-subscribing to game topics: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Sends a card play message to the server.
+     * 
+     * @param destination The destination endpoint 
+     * @param jsonPayload The JSON payload to send
+     */
+    public void sendCardPlay(String destination, String jsonPayload) {
+        try {
+            if (!isConnected()) {
+                System.err.println("❌ Cannot send card play: WebSocket not connected");
+                return;
+            }
+            
+            // Create STOMP SEND frame
+            String sendFrame = "SEND\n" +
+                              "destination:" + destination + "\n" +
+                              "content-type:application/json\n" +
+                              "\n" +
+                              jsonPayload + "\n" +
+                              "\0";
+            
+            System.out.println("📤 Sending card play message...");
+            System.out.println("STOMP Frame:\n" + sendFrame);
+            
+            webSocketClient.send(sendFrame);
+            System.out.println("✅ Card play message sent successfully");
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error sending card play message: " + e.getMessage());
             e.printStackTrace();
         }
     }

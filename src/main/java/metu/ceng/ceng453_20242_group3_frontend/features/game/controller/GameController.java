@@ -151,6 +151,9 @@ public class GameController {
     private AIPlayerController aiPlayerController;
     private CardAnimationController cardAnimationController;
     
+    // Flag to prevent duplicate game initialization
+    private boolean gameAlreadyInitialized = false;
+    
     @FXML
     private void initialize() {
         // Initialize notification manager
@@ -706,6 +709,11 @@ public class GameController {
         boolean success = game.playCard(card);
         
         if (success) {
+            // For multiplayer games, send the move to server via WebSocket
+            if (isMultiplayerGame && webSocketManager != null && webSocketManager.isConnected()) {
+                sendCardPlayToServer(card);
+            }
+            
             // Show wild card color notification separately to ensure it's always displayed
             if (card.isWildCard() && game.getCurrentColor() != CardColor.MULTI) {
                 notificationManager.showColorSelectionNotification(currentPlayer.getName(), game.getCurrentColor());
@@ -742,7 +750,7 @@ public class GameController {
                     // For DRAW_TWO and WILD_DRAW_FOUR cards, force an immediate UI update 
                     // to show the drawn cards in opponent hands
                     if (card.getAction() == CardAction.DRAW_TWO || card.getAction() == CardAction.WILD_DRAW_FOUR) {
-            updateUI();
+                        updateUI();
                     }
                 }
             });
@@ -760,10 +768,15 @@ public class GameController {
             }
             
             // Update playable cards
-                updatePlayableCards();
-                
-            // Handle AI turns
-            aiPlayerController.handleAITurns();
+            updatePlayableCards();
+            
+            // Handle AI turns - but only for singleplayer games
+            if (!isMultiplayerGame && aiPlayerController != null) {
+                aiPlayerController.handleAITurns();
+            } else if (isMultiplayerGame) {
+                // For multiplayer, we wait for WebSocket updates from other players
+                System.out.println("🎮 Multiplayer: Waiting for other players' moves via WebSocket...");
+            }
         }
     }
     
@@ -1702,16 +1715,27 @@ public class GameController {
             }
             
             @Override
-            public void onGameStateReceived(String gameState) {
+            public void onGameStateReceived(String gameStateJson) {
                 System.out.println("📊 GAME STATE UPDATE:");
-                System.out.println(gameState);
+                System.out.println(gameStateJson);
                 
-                // For now, just show the received game state in notifications
-                Platform.runLater(() -> {
-                    notificationManager.showActionNotification("", "Game state updated (see console)");
-                });
-                
-                // TODO: Parse game state and update UI accordingly
+                try {
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    JsonNode root = objectMapper.readTree(gameStateJson);
+                    
+                    // Check if this is a lobby update
+                    if (root.has("players") && root.has("ready")) {
+                        handleLobbyUpdate(root);
+                    }
+                    // Check if this is a game start event  
+                    else if (root.has("firstPlayer") && root.has("gameState")) {
+                        handleGameStart(root);
+                    }
+                    
+                } catch (Exception e) {
+                    System.err.println("❌ Failed to parse game state: " + e.getMessage());
+                    e.printStackTrace();
+                }
             }
             
             @Override
@@ -1719,7 +1743,6 @@ public class GameController {
                 System.out.println("👤 Player joined: " + playerName);
                 Platform.runLater(() -> {
                     notificationManager.showActionNotification("", playerName + " joined the game!");
-                    // TODO: Update UI to show the new player
                 });
             }
             
@@ -1728,7 +1751,6 @@ public class GameController {
                 System.out.println("👤 Player left: " + playerName);
                 Platform.runLater(() -> {
                     notificationManager.showActionNotification("", playerName + " left the game.");
-                    // TODO: Update UI to remove the player
                 });
             }
             
@@ -1737,8 +1759,14 @@ public class GameController {
                 System.out.println("🎯 Game move received:");
                 System.out.println(moveData);
                 Platform.runLater(() -> {
-                    notificationManager.showActionNotification("", "Player made a move (see console)");
-                    // TODO: Parse and apply the move to the game
+                    try {
+                        // Parse and apply the opponent's move
+                        handleOpponentMove(moveData);
+                    } catch (Exception e) {
+                        System.err.println("❌ Error processing opponent move: " + e.getMessage());
+                        e.printStackTrace();
+                        notificationManager.showActionNotification("", "Error processing opponent move");
+                    }
                 });
             }
             
@@ -1776,5 +1804,686 @@ public class GameController {
         }
         
         System.out.println("Multiplayer waiting state initialized with WebSocket");
+    }
+    
+    /**
+     * Handles lobby state updates from WebSocket.
+     * 
+     * @param lobbyData The lobby update JSON data
+     */
+    private void handleLobbyUpdate(JsonNode lobbyData) {
+        Platform.runLater(() -> {
+            try {
+                System.out.println("🏛️ === LOBBY UPDATE ===");
+                
+                if (lobbyData.has("gameId")) {
+                    int gameId = lobbyData.get("gameId").asInt();
+                    System.out.println("🎯 Game ID: " + gameId);
+                }
+                
+                // Handle players array
+                if (lobbyData.has("players") && lobbyData.get("players").isArray()) {
+                    JsonNode players = lobbyData.get("players");
+                    System.out.println("👥 Players in lobby (" + players.size() + "):");
+                    for (int i = 0; i < players.size(); i++) {
+                        String playerName = players.get(i).asText();
+                        System.out.println("  " + (i + 1) + ". " + playerName);
+                    }
+                    
+                    // Update the turn label to show current lobby state
+                    currentTurnLabel.setText("LOBBY: " + players.size() + " PLAYERS JOINED");
+                }
+                
+                // Handle ready status
+                if (lobbyData.has("ready")) {
+                    boolean ready = lobbyData.get("ready").asBoolean();
+                    System.out.println("🚦 Game Ready: " + (ready ? "YES" : "NO"));
+                    
+                    if (ready) {
+                        System.out.println("🎉 LOBBY IS READY - GAME STARTING SOON!");
+                        currentTurnLabel.setText("GAME STARTING...");
+                        notificationManager.showActionNotification("", "All players joined! Game starting...");
+                    } else {
+                        currentTurnLabel.setText("WAITING FOR MORE PLAYERS...");
+                    }
+                }
+                
+                System.out.println("🏛️ === END LOBBY UPDATE ===");
+                
+            } catch (Exception e) {
+                System.err.println("❌ Error processing lobby update: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+    }
+    
+    /**
+     * Handles game start events and transitions UI to actual game.
+     * 
+     * @param startData The game start JSON data
+     */
+    private void handleGameStart(JsonNode startData) {
+        Platform.runLater(() -> {
+            try {
+                // Prevent duplicate game initialization
+                if (gameAlreadyInitialized) {
+                    System.out.println("⏭️ Skipping duplicate game start event");
+                    return;
+                }
+                
+                System.out.println("🚀 === GAME START EVENT ===");
+                
+                String firstPlayer = "";
+                if (startData.has("firstPlayer")) {
+                    firstPlayer = startData.get("firstPlayer").asText();
+                    System.out.println("🎲 First Player: " + firstPlayer);
+                }
+                
+                // Parse the game state
+                if (startData.has("gameState")) {
+                    JsonNode gameStateNode = startData.get("gameState");
+                    
+                    // Mark as initialized to prevent duplicates
+                    gameAlreadyInitialized = true;
+                    
+                    initializeMultiplayerGameFromState(gameStateNode, firstPlayer);
+                } else {
+                    System.err.println("❌ No gameState found in start event");
+                }
+                
+                System.out.println("🚀 === GAME INITIALIZED ===");
+                
+            } catch (Exception e) {
+                System.err.println("❌ Error processing game start: " + e.getMessage());
+                e.printStackTrace();
+                notificationManager.showActionNotification("", "Error starting game: " + e.getMessage());
+                
+                // Reset flag on error so user can try again
+                gameAlreadyInitialized = false;
+            }
+        });
+    }
+    
+    /**
+     * Initializes the multiplayer game from received game state.
+     * 
+     * @param gameStateNode The game state JSON node
+     * @param firstPlayer The name of the first player
+     */
+    private void initializeMultiplayerGameFromState(JsonNode gameStateNode, String firstPlayer) {
+        try {
+            System.out.println("🎮 === INITIALIZING MULTIPLAYER GAME FROM STATE ===");
+            
+            // Extract basic game info
+            int gameId = gameStateNode.get("gameId").asInt();
+            String currentPlayer = gameStateNode.get("currentPlayer").asText();
+            boolean isClockwise = gameStateNode.get("isClockwise").asBoolean();
+            
+            System.out.println("Game ID: " + gameId);
+            System.out.println("Current Player: " + currentPlayer);
+            System.out.println("Direction: " + (isClockwise ? "CLOCKWISE" : "COUNTER_CLOCKWISE"));
+            
+            // Create PlayerCount enum based on number of players
+            JsonNode playerHands = gameStateNode.get("playerHands");
+            int playerCount = playerHands.size();
+            
+            PlayerCount gamePlayerCount = switch (playerCount) {
+                case 2 -> PlayerCount.TWO;
+                case 3 -> PlayerCount.THREE;
+                case 4 -> PlayerCount.FOUR;
+                default -> PlayerCount.TWO;
+            };
+            
+            // Create a new game instance for multiplayer
+            this.game = new Game(GameMode.MULTIPLAYER, gamePlayerCount);
+            
+            // Clear waiting state - make all areas visible again
+            topPlayerArea.setVisible(true);
+            leftPlayerArea.setVisible(true);  
+            rightPlayerArea.setVisible(true);
+            bottomPlayerArea.setVisible(true);
+            
+            // Add players from the game state
+            String currentUsername = SessionManager.getInstance().getCurrentUser().getUsername();
+            List<String> allPlayerNames = new ArrayList<>();
+            
+            // First add current user
+            Player humanPlayer = new Player(currentUsername);
+            game.addPlayer(humanPlayer);
+            allPlayerNames.add(currentUsername);
+            
+            // Then add other players
+            playerHands.fieldNames().forEachRemaining(playerName -> {
+                if (!playerName.equals(currentUsername)) {
+                    Player otherPlayer = new Player(playerName, false); // These are real players, not AI
+                    game.addPlayer(otherPlayer);
+                    allPlayerNames.add(playerName);
+                }
+            });
+            
+            // Parse and set player hands
+            for (Player player : game.getPlayers()) {
+                if (playerHands.has(player.getName())) {
+                    JsonNode playerCards = playerHands.get(player.getName());
+                    // Clear existing cards by creating new hand list
+                    while (player.getCardCount() > 0) {
+                        if (!player.getHand().isEmpty()) {
+                            player.removeCard(player.getHand().get(0));
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    for (JsonNode cardNode : playerCards) {
+                        Card card = parseCardFromJson(cardNode);
+                        if (card != null) {
+                            player.addCard(card);
+                        }
+                    }
+                    
+                    System.out.println("Player " + player.getName() + " has " + player.getCardCount() + " cards");
+                }
+            }
+            
+            // Set the direction CORRECTLY from backend
+            Direction direction = isClockwise ? Direction.CLOCKWISE : Direction.COUNTER_CLOCKWISE;
+            game.setDirection(direction);
+            System.out.println("🧭 Set game direction to: " + direction + " (from backend)");
+            
+            // Find and set current player - we'll track this manually since setCurrentPlayerIndex doesn't exist
+            int targetPlayerIndex = -1;
+            for (int i = 0; i < game.getPlayers().size(); i++) {
+                if (game.getPlayers().get(i).getName().equals(currentPlayer)) {
+                    targetPlayerIndex = i;
+                    break;
+                }
+            }
+            
+            // If we need to move to a different player, use nextPlayer() calls
+            if (targetPlayerIndex > 0) {
+                for (int i = 0; i < targetPlayerIndex; i++) {
+                    game.nextPlayer();
+                }
+            }
+            
+            // Handle top card if present
+            if (gameStateNode.has("topCard") && !gameStateNode.get("topCard").isNull()) {
+                JsonNode topCardNode = gameStateNode.get("topCard");
+                Card topCard = parseCardFromJson(topCardNode);
+                if (topCard != null) {
+                    game.getDiscardPile().addCard(topCard);
+                    
+                    // Set current color for wild cards
+                    if (topCard.isWildCard() && topCardNode.has("selectedColor")) {
+                        String colorName = topCardNode.get("selectedColor").asText();
+                        CardColor selectedColor = CardColor.valueOf(colorName);
+                        game.setCurrentColor(selectedColor);
+                    } else if (!topCard.isWildCard()) {
+                        game.setCurrentColor(topCard.getColor());
+                    }
+                }
+            }
+            
+            // Initialize sub-controllers
+            if (cardAnimationController == null) {
+                cardAnimationController = new CardAnimationController(gamePane, discardPileContainer);
+            }
+            
+            // Configure player areas based on player count
+            List<String> otherPlayerNames = allPlayerNames.stream()
+                .filter(name -> !name.equals(currentUsername))
+                .collect(java.util.stream.Collectors.toList());
+            
+            gameTableController.setupPlayerAreas(game, otherPlayerNames);
+            
+            // DON'T call game.startGame() as the game is already started on the backend
+            // Just update our UI based on the received state
+            
+            // DEBUG: Check initial game state
+            System.out.println("🔍 === INITIAL GAME STATE DEBUG ===");
+            System.out.println("Game started: " + game.isGameStarted());
+            System.out.println("Discard pile empty: " + game.isDiscardPileEmpty());
+            System.out.println("Top card: " + game.getDiscardPile().peekCard());
+            System.out.println("Current color: " + game.getCurrentColor());
+            System.out.println("Current player: " + game.getCurrentPlayer().getName());
+            System.out.println("Is it human player's turn: " + (game.getCurrentPlayerIndex() == 0));
+            
+            // Set the game as started (required for updatePlayableCards to work)
+            if (!game.isGameStarted()) {
+                // Manually set gameStarted flag since we're not calling startGame()
+                try {
+                    java.lang.reflect.Field gameStartedField = game.getClass().getDeclaredField("gameStarted");
+                    gameStartedField.setAccessible(true);
+                    gameStartedField.set(game, true);
+                    System.out.println("✅ Manually set gameStarted = true");
+                } catch (Exception e) {
+                    System.err.println("❌ Failed to set gameStarted flag: " + e.getMessage());
+                }
+            }
+            
+            // Update playable cards using existing singleplayer logic
+            System.out.println("🔄 Updating playable cards...");
+            game.updatePlayableCards();
+            
+            // DEBUG: Check playability after update
+            Player humanPlayer2 = game.getPlayers().get(0);
+            int playableCount = 0;
+            for (Card card : humanPlayer2.getHand()) {
+                if (card.isPlayable()) playableCount++;
+                System.out.println("Card: " + card + " - Playable: " + card.isPlayable());
+            }
+            System.out.println("Total playable cards: " + playableCount + " / " + humanPlayer2.getCardCount());
+            System.out.println("🔍 === END DEBUG ===");
+            
+            // Update the UI
+            updateUI();
+            updateDirectionIndicator();
+            updateTurnLabel();
+            updateUnoIndicators();
+            
+            // Show success notification
+            String userTurnMessage = currentPlayer.equals(currentUsername) ? "It's your turn!" : firstPlayer + " goes first";
+            notificationManager.showActionNotification("", "Game started! " + userTurnMessage);
+            
+            System.out.println("✅ Multiplayer game successfully initialized from WebSocket state!");
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error initializing multiplayer game: " + e.getMessage());
+            e.printStackTrace();
+            notificationManager.showActionNotification("", "Failed to start game: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Parses a card from JSON data.
+     * 
+     * @param cardNode The JSON node containing card data
+     * @return The parsed Card object or null if parsing failed
+     */
+    private Card parseCardFromJson(JsonNode cardNode) {
+        try {
+            String colorName = cardNode.get("color").asText();
+            CardColor color = CardColor.valueOf(colorName);
+            
+            // Extract card ID
+            Integer cardId = cardNode.has("id") ? cardNode.get("id").asInt() : null;
+            
+            // Parse action if present
+            CardAction action = CardAction.NONE;
+            if (cardNode.has("action") && !cardNode.get("action").isNull()) {
+                String actionName = cardNode.get("action").asText();
+                action = CardAction.valueOf(actionName);
+            }
+            
+            // For number cards, get the value
+            if (cardNode.has("value") && !cardNode.get("value").isNull()) {
+                int value = cardNode.get("value").asInt();
+                return new Card(cardId, color, value);
+            } else if (cardNode.has("number") && !cardNode.get("number").isNull()) {
+                // Handle backend format with "number" field
+                int value = cardNode.get("number").asInt();
+                return new Card(cardId, color, value);
+            } else {
+                // For action cards
+                return new Card(cardId, color, action);
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error parsing card from JSON: " + e.getMessage());
+            System.err.println("Card data: " + cardNode.toString());
+            return null;
+        }
+    }
+    
+    /**
+     * Sends a card play move to the server via WebSocket for multiplayer games.
+     * 
+     * @param card The card that was played
+     */
+    private void sendCardPlayToServer(Card card) {
+        try {
+            if (!webSocketManager.isConnected() || gameId == null) {
+                System.err.println("Cannot send card play: WebSocket not connected or no game ID");
+                return;
+            }
+            
+            // Check if card has ID (required for backend)
+            if (card.getId() == null) {
+                System.err.println("Cannot send card play: Card has no ID - " + card);
+                return;
+            }
+            
+            // Create the card play message in the format backend expects
+            String cardPlayJson = createCardPlayJson(card);
+            
+            // Send to the server's card play endpoint
+            String destination = "/app/game/" + gameId + "/play";
+            
+            System.out.println("🎯 === SENDING CARD PLAY TO SERVER ===");
+            System.out.println("Destination: " + destination);
+            System.out.println("Card: " + card);
+            System.out.println("Card ID: " + card.getId());
+            System.out.println("JSON: " + cardPlayJson);
+            System.out.println("=====================================");
+            
+            // Use the WebSocketManager to send the message
+            webSocketManager.sendCardPlay(destination, cardPlayJson);
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error sending card play to server: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Creates JSON representation of a card play for the server.
+     * 
+     * @param card The card being played
+     * @return JSON string representing the card play
+     */
+    private String createCardPlayJson(Card card) {
+        try {
+            // Create JSON in the format expected by PlayerCardRequest
+            StringBuilder json = new StringBuilder();
+            json.append("{");
+            json.append("\"cardId\":").append(card.getId());
+            
+            // Add selected color for wild cards
+            if (card.isWildCard() && game.getCurrentColor() != null) {
+                json.append(",\"selectedColor\":\"").append(game.getCurrentColor().name()).append("\"");
+            }
+            
+            json.append("}");
+            
+            return json.toString();
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error creating card play JSON: " + e.getMessage());
+            return "{\"error\":\"Failed to create card play JSON\"}";
+        }
+    }
+    
+    /**
+     * Handles an opponent's move received via WebSocket.
+     * 
+     * @param moveData The JSON data containing the opponent's move
+     */
+    private void handleOpponentMove(String moveData) {
+        try {
+            System.out.println("🎮 === PROCESSING OPPONENT MOVE ===");
+            System.out.println("Move data: " + moveData);
+            
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode moveNode = objectMapper.readTree(moveData);
+            
+            // Check if this is a full game state update or individual move
+            if (moveNode.has("gameState")) {
+                // This is a wrapped game state update
+                System.out.println("📊 Wrapped game state received, extracting current state");
+                JsonNode gameStateNode = moveNode.get("gameState");
+                handleGameStateUpdate(gameStateNode);
+            } else if (moveNode.has("gameId") && moveNode.has("currentPlayer")) {
+                // This is a direct game state object from backend (most likely scenario)
+                System.out.println("📊 Direct game state object received from backend");
+                handleGameStateUpdate(moveNode);
+            } else if (moveNode.has("player")) {
+                // This is an individual move (old format)
+                System.out.println("🎯 Individual move received, processing...");
+                handleIndividualMove(moveNode);
+            } else {
+                System.err.println("❌ Unknown move data format: " + moveData);
+                System.err.println("Available fields:");
+                moveNode.fieldNames().forEachRemaining(field -> System.err.println("  - " + field));
+            }
+            
+            System.out.println("🎮 === OPPONENT MOVE PROCESSED ===");
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error handling opponent move: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Handles a full game state update from the backend.
+     * 
+     * @param gameStateNode The game state JSON
+     */
+    private void handleGameStateUpdate(JsonNode gameStateNode) {
+        try {
+            System.out.println("🔄 Processing full game state update");
+            
+            // Extract current player and top card info
+            String currentPlayer = gameStateNode.get("currentPlayer").asText();
+            
+            // Check if the current player has changed (indicating a move was made)
+            String previousPlayer = game.getCurrentPlayer().getName();
+            if (!currentPlayer.equals(previousPlayer)) {
+                System.out.println("📈 Turn changed from " + previousPlayer + " to " + currentPlayer);
+                
+                // Check if there's a new top card
+                if (gameStateNode.has("topCard") && !gameStateNode.get("topCard").isNull()) {
+                    JsonNode topCardNode = gameStateNode.get("topCard");
+                    Card newTopCard = parseCardFromJson(topCardNode);
+                    
+                    if (newTopCard != null) {
+                        // Update our game state
+                        game.getDiscardPile().addCard(newTopCard);
+                        
+                        // Update current color
+                        if (newTopCard.isWildCard() && topCardNode.has("selectedColor")) {
+                            String selectedColorName = topCardNode.get("selectedColor").asText();
+                            CardColor selectedColor = CardColor.valueOf(selectedColorName);
+                            game.setCurrentColor(selectedColor);
+                        } else if (!newTopCard.isWildCard()) {
+                            game.setCurrentColor(newTopCard.getColor());
+                        }
+                        
+                        System.out.println("🎴 New top card: " + newTopCard);
+                        
+                        // Find the player who just played and remove a card from their hand
+                        for (Player player : game.getPlayers()) {
+                            if (player.getName().equals(previousPlayer)) {
+                                // Remove one card from their hand (we don't know which one)
+                                if (!player.getHand().isEmpty()) {
+                                    player.removeCard(player.getHand().get(0));
+                                    System.out.println("🗂️ Removed card from " + previousPlayer + "'s hand");
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Update current player
+                for (int i = 0; i < game.getPlayers().size(); i++) {
+                    if (game.getPlayers().get(i).getName().equals(currentPlayer)) {
+                        // Move to the correct player
+                        while (game.getCurrentPlayerIndex() != i) {
+                            game.nextPlayer();
+                        }
+                        break;
+                    }
+                }
+                
+                // Update UI
+                updateUI();
+                updateDirectionIndicator();
+                updateTurnLabel();
+                updateUnoIndicators();
+                
+                System.out.println("✅ Game state synchronized from backend");
+            } else {
+                System.out.println("ℹ️ No turn change detected, skipping update");
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error processing game state update: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Handles an individual move (original format).
+     * 
+     * @param moveNode The individual move JSON
+     */
+    private void handleIndividualMove(JsonNode moveNode) {
+        try {
+            // Extract move information
+            if (moveNode.has("player")) {
+                String playerName = moveNode.get("player").asText();
+                System.out.println("Player: " + playerName);
+                
+                // Find the player who made the move
+                Player movingPlayer = null;
+                for (Player player : game.getPlayers()) {
+                    if (player.getName().equals(playerName)) {
+                        movingPlayer = player;
+                        break;
+                    }
+                }
+                
+                if (movingPlayer == null) {
+                    System.err.println("❌ Player not found: " + playerName);
+                    return;
+                }
+                
+                // Create the card that was played
+                Card playedCard = null;
+                if (moveNode.has("color")) {
+                    String colorName = moveNode.get("color").asText();
+                    CardColor color = CardColor.valueOf(colorName);
+                    
+                    if (moveNode.has("value") && !moveNode.get("value").isNull()) {
+                        // Number card
+                        int value = moveNode.get("value").asInt();
+                        playedCard = new Card(color, value);
+                    } else if (moveNode.has("action") && !moveNode.get("action").isNull()) {
+                        // Action card
+                        String actionName = moveNode.get("action").asText();
+                        CardAction action = CardAction.valueOf(actionName);
+                        playedCard = new Card(color, action);
+                    }
+                }
+                
+                if (playedCard != null) {
+                    System.out.println("Card played: " + playedCard);
+                    
+                    // Apply the move to our game state
+                    applyOpponentMove(movingPlayer, playedCard, moveNode);
+                } else {
+                    System.err.println("❌ Could not parse played card from move data");
+                }
+                
+            } else {
+                System.err.println("❌ No player information in move data");
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error handling individual move: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Applies an opponent's move to the local game state.
+     * 
+     * @param player The player who made the move
+     * @param card The card that was played
+     * @param moveNode The full move data for additional information
+     */
+    private void applyOpponentMove(Player player, Card card, JsonNode moveNode) {
+        try {
+            System.out.println("🔄 Applying opponent move: " + player.getName() + " plays " + card);
+            
+            // Remove the card from the player's hand
+            Card cardToRemove = null;
+            for (Card handCard : player.getHand()) {
+                if (handCard.getColor() == card.getColor() && 
+                    handCard.getValue() == card.getValue() && 
+                    handCard.getAction() == card.getAction()) {
+                    cardToRemove = handCard;
+                    break;
+                }
+            }
+            
+            if (cardToRemove != null) {
+                player.removeCard(cardToRemove);
+                System.out.println("✅ Removed card from " + player.getName() + "'s hand");
+            } else {
+                System.out.println("⚠️ Card not found in player's hand, adding to discard pile anyway");
+            }
+            
+            // Add card to discard pile
+            game.getDiscardPile().addCard(card);
+            
+            // Handle wild card color selection
+            if (card.isWildCard() && moveNode.has("selectedColor")) {
+                String selectedColorName = moveNode.get("selectedColor").asText();
+                CardColor selectedColor = CardColor.valueOf(selectedColorName);
+                game.setCurrentColor(selectedColor);
+                System.out.println("🎨 Wild card color set to: " + selectedColor);
+                
+                // Show color notification
+                notificationManager.showColorSelectionNotification(player.getName(), selectedColor);
+            } else if (!card.isWildCard()) {
+                game.setCurrentColor(card.getColor());
+            }
+            
+            // Handle special card actions
+            handleOpponentSpecialCard(card, player);
+            
+            // Move to next player
+            game.nextPlayer();
+            
+            // Update UI
+            updateUI();
+            updateDirectionIndicator();
+            updateTurnLabel();
+            updateUnoIndicators();
+            
+            // Show notification
+            String actionMessage = notificationManager.getActionMessage(card, player.getName(), "");
+            if (actionMessage != null) {
+                notificationManager.showActionNotification(player.getName(), actionMessage);
+            }
+            
+            System.out.println("✅ Opponent move applied successfully");
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error applying opponent move: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Handles special card actions for opponent moves.
+     * 
+     * @param card The special card played
+     * @param player The player who played it
+     */
+    private void handleOpponentSpecialCard(Card card, Player player) {
+        switch (card.getAction()) {
+            case REVERSE:
+                game.reverseDirection();
+                System.out.println("🔄 Direction reversed by " + player.getName());
+                break;
+                
+            case SKIP:
+                // The backend handles the skip logic, we just need to update UI
+                System.out.println("⏭️ " + player.getName() + " played SKIP");
+                break;
+                
+            case DRAW_TWO:
+            case WILD_DRAW_FOUR:
+                // The backend handles drawing cards, we just need to update UI
+                System.out.println("📤 " + player.getName() + " played " + card.getAction());
+                break;
+                
+            default:
+                // Regular card, no special action needed
+                break;
+        }
     }
 } 
